@@ -557,8 +557,7 @@ const updateTrains = async () => {
                   `${title(rawTrainData.from)}-${title(rawTrainData.to)}`,
                 trainNum: `${actualTrainNum}`,
                 trainNumRaw: trainNum.split(" ")[0],
-                trainID: `${actualTrainNum}-${rawTrainData.instance.split("-")[2]
-                  }`,
+                trainID: `${actualTrainNum}-${Number(rawTrainData.instance.split("-")[2])}`,
                 lat:
                   rawTrainData.lat ??
                   stationMetaData.viaCoords[trainEventStation.code][0],
@@ -586,9 +585,7 @@ const updateTrains = async () => {
                     };
                   }
 
-                  allStations[station.code].trains.push(
-                    `${actualTrainNum}-${rawTrainData.instance.split("-")[2]}`
-                  );
+                  allStations[station.code].trains.push(`${actualTrainNum}-${Number(rawTrainData.instance.split("-")[2])}`);
 
                   if (station.arrival && station.arrival.estimated) {
                     trainDelay =
@@ -1098,7 +1095,7 @@ Bun.serve({
       const params = new URL(request.url).searchParams;
       const paramsObj = Object.fromEntries(params.entries());
 
-      if (!paramsObj.url) {paramsObj.url = 'https://amtraker.com/'};
+      if (!paramsObj.url) { paramsObj.url = 'https://amtraker.com/' };
 
       const requestedURL = new URL(paramsObj.url);
       const processedURL =
