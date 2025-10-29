@@ -1,15 +1,12 @@
 // so much goop god this needs a hell of a rewrite
 
-import * as crypto from "crypto-js";
 import moment from "moment-timezone";
-import * as schedule from "node-schedule";
-import * as fs from "fs";
+import fs from "fs";
 import { XMLBuilder } from "fast-xml-parser";
 
 const xmlBuilder = new XMLBuilder();
 
-import { Amtrak, RawStation } from "./types/amtrak";
-import { RawViaTrain } from "./types/via";
+import { RawStation } from "./types/amtrak";
 import {
   Train,
   Station,
@@ -25,32 +22,7 @@ import cache from "./cache";
 
 const rawStations = JSON.parse(fs.readFileSync("./rawStations.json", { encoding: "utf8" }));
 
-import length from "@turf/length";
-import along from "@turf/along";
 import calculateIconColor from "./calculateIconColor";
-
-const snowPiercerShape = JSON.parse(
-  fs.readFileSync("./snowPiercer.json", "utf8")
-);
-const snowPiercerShapeLength = length(snowPiercerShape);
-
-const calculateSnowPiercerPosition = (time: Date) => {
-  const timesAround = Math.abs(
-    Number(
-      (
-        ((time.valueOf() -
-          new Date(new Date().toISOString().split("T")[0]).getTime()) /
-          (1000 * 60 * 60 * 6)) %
-        1
-      ).toFixed(4)
-    )
-  );
-  const distanceOnShape = snowPiercerShapeLength * timesAround;
-
-  const point = along(snowPiercerShape, distanceOnShape);
-
-  return point;
-};
 
 let staleData = {
   avgLastUpdate: 0,
@@ -59,17 +31,6 @@ let staleData = {
 };
 
 let shitsFucked = false;
-
-const amtrakTrainsURL =
-  "https://maps.amtrak.com/services/MapDataService/trains/getTrainsData";
-const amtrakStationsURL =
-  "https://maps.amtrak.com/services/MapDataService/stations/trainStations";
-const sValue = "9a3686ac";
-const iValue = "c6eb2f7f5c4740c1a2f708fefd947d39";
-const publicKey = "69af143c-e8cf-47f8-bf09-fc1f61e5cc33";
-const masterSegment = 88;
-
-const viaURL = "https://tsimobile.viarail.ca/data/allData.json";
 
 const amtrakerCache = new cache();
 let decryptedTrainData = "";
@@ -100,79 +61,32 @@ const ccDegToCardinal = (deg) => {
   return "N";
 };
 
-const decrypt = (content, key) => {
-  return crypto.AES.decrypt(
-    crypto.lib.CipherParams.create({
-      ciphertext: crypto.enc.Base64.parse(content),
-    }),
-    crypto.PBKDF2(key, crypto.enc.Hex.parse(sValue), {
-      keySize: 4,
-      iterations: 1e3,
-      hasher: crypto.algo.SHA1 // thank you cabalex!
-    }),
-    { iv: crypto.enc.Hex.parse(iValue) }
-  ).toString(crypto.enc.Utf8);
-};
-
 const fetchAmtrakTrainsForCleaning = async () => {
-  const response = await fetch(amtrakTrainsURL + `?${Date.now()}=true`);
-  const data = await response.text();
-
+  const data: any[] = await fetch("https://store.transitstat.us/amtrak_fetch_proxy/trainDataMain/features" + (process.env.SUPER_SECRET_CACHE_BUSTING ?? '')).then((res) => res.json());
   console.log("fetch in t");
 
-  const mainContent = data.substring(0, data.length - masterSegment);
-  const encryptedPrivateKey = data.substr(
-    data.length - masterSegment,
-    data.length
-  );
-  const privateKey = decrypt(encryptedPrivateKey, publicKey).split("|")[0];
-  const decryptedData = decrypt(mainContent, privateKey);
+  decryptedTrainData = JSON.stringify(data);
 
-  console.log("dec in t");
-
-  //console.log(decryptedTrainData);
-
-  try {
-    decryptedTrainData = JSON.stringify(JSON.parse(decryptedData).features);
-
-    return JSON.parse(decryptedData).features;
-  } catch (e) {
-    shitsFucked = true;
-    return [];
-  }
+  return data;
 };
 
 const fetchAmtrakStationsForCleaning = async () => {
-  const response = await fetch(amtrakStationsURL + `?${Date.now()}=true`);
-  const data = await response.text();
+  const data: any[] = await fetch("https://store.transitstat.us/amtrak_fetch_proxy/trainStations/features" + (process.env.SUPER_SECRET_CACHE_BUSTING ?? '')).then((res) => res.json());
+  console.log("fetch in t");
 
-  const mainContent = data.substring(0, data.length - masterSegment);
-  const encryptedPrivateKey = data.substr(
-    data.length - masterSegment,
-    data.length
-  );
-  const privateKey = decrypt(encryptedPrivateKey, publicKey).split("|")[0];
-  const decrypted = decrypt(mainContent, privateKey);
-
-  try {
-    decryptedStationData = JSON.stringify(
-      JSON.parse(decrypted)?.StationsDataResponse
-    );
-
-    return decrypted.length > 0
-      ? JSON.parse(decrypted)?.StationsDataResponse?.features
-      : rawStations.features;
-  } catch (e) {
-    //console.log("stations e:", e.toString());
+  if (data.length == 0) {
     decryptedStationData = JSON.stringify(rawStations.features);
     return rawStations.features;
+  } else {
+    decryptedStationData = JSON.stringify(data);
+    return data;
   }
 };
 
 const fetchViaForCleaning = async () => {
   try {
-    const response = await fetch(viaURL + `?${Date.now()}=true`);
-    const data = await response.json();
+    const data = await fetch("https://store.transitstat.us/amtrak_fetch_proxy/trainDataVIA" + (process.env.SUPER_SECRET_CACHE_BUSTING ?? ''))
+      .then((res) => res.json());
 
     return data;
   } catch (e) {
@@ -243,34 +157,6 @@ const parseDate = (badDate: string | null, code: string | null) => {
   } catch (e) {
     console.log("Couldn't parse date:", badDate, code);
     return null;
-  }
-};
-
-const generateCmnt = (
-  scheduledDate: string,
-  actualDate: string,
-  code: string
-) => {
-  let parsedScheduledDate = parseDate(scheduledDate, code);
-  let parsedActualDate = parseDate(actualDate, code);
-  let earlyOrLate = moment(parsedScheduledDate).isBefore(parsedActualDate)
-    ? "Late"
-    : "Early";
-
-  let diff = moment(parsedActualDate).diff(parsedScheduledDate);
-
-  let duration = moment.duration(diff);
-  let hrs = duration.hours(),
-    mins = duration.minutes();
-
-  let string =
-    (hrs > 0 ? Math.abs(hrs) + " Hours, " : "") +
-    (Math.abs(mins) + " Minutes ");
-
-  if (mins < 5 && earlyOrLate === "Late") {
-    return "On Time";
-  } else {
-    return string + earlyOrLate;
   }
 };
 
@@ -367,9 +253,7 @@ const updateTrains = async () => {
   shitsFucked = false;
 
   // getting allttmtrains for ASMAD
-  fetch(
-    `https://maps.amtrak.com/services/MapDataService/stations/AllTTMTrains?${Date.now()}=true`
-  )
+  fetch("https://store.transitstat.us/amtrak_fetch_proxy/trainDataASMAD" + (process.env.SUPER_SECRET_CACHE_BUSTING ?? ''))
     .then((res) => res.text())
     .then((data) => {
       AllTTMTrains = data;
@@ -385,9 +269,9 @@ const updateTrains = async () => {
     trainPlatforms = {};
   }
 
-  const amtrakAlertsData = await fetch("https://store.transitstat.us/amtrak_alerts").then((res) => res.json());
+  const amtrakAlertsData = await fetch("https://store.transitstat.us/amtrak_alerts" + (process.env.SUPER_SECRET_CACHE_BUSTING ?? '')).then((res) => res.json());
 
-  const brightlineRes = await fetch('https://store.transitstat.us/brightline');
+  const brightlineRes = await fetch('https://store.transitstat.us/brightline' + (process.env.SUPER_SECRET_CACHE_BUSTING ?? ''));
   const rawBrightline = await brightlineRes.json();
   brightlineData = rawBrightline['v1'];
   brightlinePlatforms = rawBrightline['platforms'];
@@ -861,7 +745,7 @@ const updateTrains = async () => {
 
 updateTrains();
 
-schedule.scheduleJob("*/5 * * * *", updateTrains);
+setInterval(() => updateTrains(), 1000 * 15); // every 15 seconds
 
 Bun.serve({
   port: process.env.PORT ?? 3001,

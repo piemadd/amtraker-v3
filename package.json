@@ -14,14 +14,11 @@
     "@turf/helpers": "^7.2.0",
     "@turf/length": "^6.5.0",
     "bun-types": "^0.1.4",
-    "crypto-js": "^4.2.0",
     "fast-xml-parser": "^4.4.0",
     "geo-tz": "^7.0.2",
-    "gtfs-realtime-bindings": "^1.1.1",
     "moment": "2.29.4",
     "moment-duration-format": "2.3.2",
     "moment-timezone": "0.5.34",
-    "node-schedule": "^2.1.0",
     "uuid": "^8.3.2"
   }
 }
