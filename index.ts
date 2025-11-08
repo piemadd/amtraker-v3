@@ -248,6 +248,9 @@ const updateTrains = async () => {
   const amtrakData = allProxiedData.trainDataMain.features;
   AllTTMTrains = JSON.stringify(allProxiedData.trainDataASMAD);
   lastUpdatedTime = allProxiedData.updatedTime;
+  decryptedTrainData = JSON.stringify(amtrakData);
+  decryptedStationData = JSON.stringify(stationData);
+
 
   console.log("fetched s");
   stationData.forEach((station) => {
