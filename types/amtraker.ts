@@ -11,13 +11,13 @@ export interface Train {
   stations: Station[];
   heading: string;
   eventCode: string;
-  eventTZ: string[];
+  eventTZ: string;
   eventName: string;
   origCode: string;
-  originTZ: string[];
+  originTZ: string;
   origName: string;
   destCode: string;
-  destTZ: string[];
+  destTZ: string;
   destName: string;
   trainState: string;
   velocity: number;
@@ -79,7 +79,7 @@ export interface StationMeta {
   address2: string;
   city: string;
   state: string;
-  zip: number;
+  zip: string;
   trains: string[];
 }
 

@@ -251,6 +251,7 @@ const updateTrains = async () => {
   decryptedTrainData = JSON.stringify(amtrakData);
   decryptedStationData = JSON.stringify(stationData);
 
+  const cpkcHolidayTrainData: any = await fetch("https://store.transitstat.us/cpkc_holiday" + (process.env.SUPER_SECRET_CACHE_BUSTING ?? '')).then((res) => res.json());
 
   console.log("fetched s");
   stationData.forEach((station) => {
@@ -267,7 +268,7 @@ const updateTrains = async () => {
       address2: station.properties.Address2,
       city: station.properties.City,
       state: station.properties.State,
-      zip: station.properties.Zipcode,
+      zip: station.properties.Zipcode.toString(),
       trains: [],
     };
 
@@ -281,6 +282,79 @@ const updateTrains = async () => {
   staleData.activeTrains = 0;
   staleData.avgLastUpdate = 0;
   staleData.stale = false;
+
+  Object.keys(cpkcHolidayTrainData.trains).forEach((trainKey) => {
+    const trainData = cpkcHolidayTrainData.trains[trainKey];
+
+    let train: Train = {
+      routeName: `CP ${trainData.line} Holiday`,
+      trainNum: `CP${trainKey}`,
+      trainNumRaw: trainKey,
+      trainID: `CP${trainKey}-25`,
+      lat: trainData.lat,
+      lon: trainData.lon,
+      trainTimely: "",
+      iconColor: '#' + trainData.lineColor,
+      textColor: '#' + trainData.lineTextColor,
+      stations: [{
+        "name": "Christmas",
+        "code": "CPKC",
+        "tz": "America/Chicago",
+        "bus": false,
+        "schArr": "2025-12-25T00:00:00-06:00",
+        "schDep": "2025-12-25T00:00:00-06:00",
+        "arr": "2025-12-25T00:00:00-06:00",
+        "dep": "2025-12-25T00:00:00-06:00",
+        "arrCmnt": "",
+        "depCmnt": "",
+        "status": "Enroute",
+        "stopIconColor": '#' + trainData.lineColor,
+        "platform": ""
+      }],
+      heading: trainData.headingLetter,
+      eventCode: 'CPKC',
+      eventTZ: 'America/Chicago',
+      eventName: 'Christmas',
+      origCode: 'CPKC',
+      originTZ: 'America/Chicago',
+      origName: 'Christmas',
+      destCode: 'CPKC',
+      destTZ: 'America/Chicago',
+      destName: 'Christmas',
+      trainState: "Active",
+      velocity: 0, // no data unfortunately
+      statusMsg: " ",
+      createdAt: cpkcHolidayTrainData['lastUpdated'] ?? new Date().toISOString(),
+      updatedAt: cpkcHolidayTrainData['lastUpdated'] ?? new Date().toISOString(),
+      lastValTS: cpkcHolidayTrainData['lastUpdated'] ?? new Date().toISOString(),
+      objectID: Number(trainKey),
+      provider: "Canadian Pacific Kansas City",
+      providerShort: "CPKC",
+      onlyOfTrainNum: true,
+      alerts: [],
+    };
+
+    if (!allStations['CPKC']) {
+      allStations['CPKC'] = {
+        name: 'Christmas',
+        code: 'CPKC',
+        tz: 'America/Chicago',
+        lat: 83.29825041784702,
+        lon: -34.49599261128057,
+        hasAddress: true,
+        address1: "North Pole",
+        address2: "This is a work in progress, actual stop times are coming.",
+        city: "",
+        state: "",
+        zip: "",
+        trains: [],
+      }
+    }
+
+    allStations['CPKC'].trains.push(`CP${trainKey}-25`);
+
+    trains[`CP${trainKey}`] = [train];
+  });
 
   Object.keys(brightlineData['trains']).forEach((trainNum) => {
     const rawTrainData = brightlineData['trains'][trainNum];
@@ -315,7 +389,7 @@ const updateTrains = async () => {
             address2: "",
             city: "",
             state: "",
-            zip: 0,
+            zip: "",
             trains: [],
           }
         }
@@ -432,7 +506,7 @@ const updateTrains = async () => {
             address2: "",
             city: "",
             state: "",
-            zip: 0,
+            zip: "",
             trains: [],
           };
         }
@@ -558,7 +632,7 @@ const updateTrains = async () => {
             address2: "",
             city: "",
             state: "",
-            zip: 0,
+            zip: "",
             trains: [],
           });
         }
@@ -741,7 +815,7 @@ Bun.serve({
         }
       );
     }
-    
+
     if (url === '/v3/times') {
       return new Response(
         JSON.stringify(lastUpdatedTime),
