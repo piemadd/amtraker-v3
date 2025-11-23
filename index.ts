@@ -296,21 +296,57 @@ const updateTrains = async () => {
       trainTimely: "",
       iconColor: '#' + trainData.lineColor,
       textColor: '#' + trainData.lineTextColor,
-      stations: [{
-        "name": "Christmas",
-        "code": "CPKC",
-        "tz": "America/Chicago",
-        "bus": false,
-        "schArr": "2025-12-25T00:00:00-06:00",
-        "schDep": "2025-12-25T00:00:00-06:00",
-        "arr": "2025-12-25T00:00:00-06:00",
-        "dep": "2025-12-25T00:00:00-06:00",
-        "arrCmnt": "",
-        "depCmnt": "",
-        "status": "Enroute",
-        "stopIconColor": '#' + trainData.lineColor,
-        "platform": ""
-      }],
+      stations: trainData.predictions.map((prediction) => {
+        const stationMeta = cpkcHolidayTrainData.stations[prediction.stationID];
+
+        if (!allStations[prediction.stationID]) {
+          allStations[prediction.stationID] = {
+            name: prediction.stationName,
+            code: prediction.stationID,
+            tz: prediction.tz,
+            lat: stationMeta.lat,
+            lon: stationMeta.lon,
+            hasAddress: false,
+            address1: "",
+            address2: "",
+            city: "",
+            state: "",
+            zip: "",
+            trains: [],
+          }
+        }
+
+        allStations[prediction.stationID].trains.push(`CP${trainKey}-25`);
+
+        const arr = new Date(prediction.arr ?? prediction.dep);
+        const dep = new Date(prediction.dep ?? prediction.arr);
+
+        const arrString = arr.toISOString();
+        const depString = dep.toISOString();
+
+        const arrNum = arr.valueOf();
+        const depNum = arr.valueOf();
+
+        const now = Date.now();
+
+        return {
+          name: prediction.stationName,
+          code: prediction.stationID,
+          tz: "America/Chicago",
+          bus: false,
+          schArr: arrString,
+          schDep: depString,
+          arr: arrString,
+          dep: depString,
+          arrCmnt: "",
+          depCmnt: "",
+          status: now < arrNum ? "Enroute" : (
+            now > arrNum && now < depNum ? "Station" : "Departed"
+          ),
+          stopIconColor: "#267300",
+          platform: ""
+        };
+      }),
       heading: trainData.headingLetter,
       eventCode: 'CPKC',
       eventTZ: 'America/Chicago',
@@ -333,6 +369,22 @@ const updateTrains = async () => {
       onlyOfTrainNum: true,
       alerts: [],
     };
+
+    train.stations.push({
+      name: "Christmas",
+      code: "CPKC",
+      tz: "America/Chicago",
+      bus: false,
+      schArr: "2025-12-25T00:00:00-06:00",
+      schDep: "2025-12-25T00:00:00-06:00",
+      arr: "2025-12-25T00:00:00-06:00",
+      dep: "2025-12-25T00:00:00-06:00",
+      arrCmnt: "",
+      depCmnt: "",
+      status: "Enroute",
+      stopIconColor: "#267300",
+      platform: ""
+    });
 
     if (!allStations['CPKC']) {
       allStations['CPKC'] = {
