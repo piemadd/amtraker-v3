@@ -296,7 +296,7 @@ const updateTrains = async () => {
       trainTimely: "",
       iconColor: '#' + trainData.lineColor,
       textColor: '#' + trainData.lineTextColor,
-      stations: trainData.predictions.map((prediction) => {
+      stations: [trainData.predictions, trainData.hiddenPredictions].flat().sort((a, b) => a.rawETA - b.rawETA).map((prediction) => {
         const stationMeta = cpkcHolidayTrainData.stations[prediction.stationID];
 
         if (!allStations[prediction.stationID]) {
@@ -369,6 +369,20 @@ const updateTrains = async () => {
       onlyOfTrainNum: true,
       alerts: [],
     };
+
+    const firstStation = train.stations[0];
+    const lastStation = train.stations[train.stations.length - 1];
+    const upcomingStation = train.stations.find((station) => station.status == 'Enroute' || station.status == 'Station') ?? lastStation;
+
+    train.origCode = firstStation.code;
+    train.originTZ = firstStation.tz;
+    train.origName = firstStation.name;
+    train.eventCode = firstStation.code;
+    train.eventName = firstStation.tz;
+    train.eventTZ = firstStation.name;
+    train.destCode = firstStation.code;
+    train.destName = firstStation.tz;
+    train.destTZ = firstStation.name;
 
     train.stations.push({
       name: "Christmas",
