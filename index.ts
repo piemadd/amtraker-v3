@@ -294,8 +294,8 @@ const updateTrains = async () => {
       lat: trainData.lat,
       lon: trainData.lon,
       trainTimely: "",
-      iconColor: '#' + trainData.lineColor,
-      textColor: '#' + trainData.lineTextColor,
+      iconColor: '#a80000',
+      textColor: '#ffffff',
       stations: [trainData.predictions, trainData.hiddenPredictions].flat().sort((a, b) => a.rawETA - b.rawETA).map((prediction) => {
         const stationMeta = cpkcHolidayTrainData.stations[prediction.stationID];
 
