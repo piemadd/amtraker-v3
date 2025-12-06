@@ -378,11 +378,11 @@ const updateTrains = async () => {
     train.originTZ = firstStation.tz;
     train.origName = firstStation.name;
     train.eventCode = upcomingStation.code;
-    train.eventName = upcomingStation.tz;
-    train.eventTZ = upcomingStation.name;
+    train.eventName = upcomingStation.name;
+    train.eventTZ = upcomingStation.tz;
     train.destCode = lastStation.code;
-    train.destName = lastStation.tz;
-    train.destTZ = lastStation.name;
+    train.destName = lastStation.name;
+    train.destTZ = lastStation.tz;
 
     train.stations.push({
       name: "Christmas",
