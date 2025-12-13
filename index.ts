@@ -296,7 +296,7 @@ const updateTrains = async () => {
       trainTimely: "",
       iconColor: '#a80000',
       textColor: '#ffffff',
-      stations: [trainData.predictions, trainData.hiddenPredictions].flat().sort((a, b) => a.rawETA - b.rawETA).map((prediction) => {
+      stations: trainData.predictions.sort((a, b) => a.rawETA - b.rawETA).map((prediction) => {
         const stationMeta = cpkcHolidayTrainData.stations[prediction.stationID];
 
         if (!allStations[prediction.stationID]) {
