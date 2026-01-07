@@ -45,6 +45,7 @@ let AllTTMTrains = "";
 let trainPlatforms = {};
 let brightlineData = {};
 let brightlinePlatforms = {};
+let additionalVIAStops = {};
 
 //https://stackoverflow.com/questions/196972/convert-string-to-title-case-with-javascript
 const title = (str: string) => {
@@ -281,6 +282,146 @@ const updateTrains = async () => {
   staleData.avgLastUpdate = 0;
   staleData.stale = false;
 
+  /*
+  // BEGIN SANTA
+  let santaTrain: Train = {
+    routeName: `Santa Claus`,
+    trainNum: `SC1225`,
+    trainNumRaw: '1225',
+    trainID: `SC1225-25`,
+    lat: trainData.lat,
+    lon: trainData.lon,
+    trainTimely: "",
+    iconColor: '#a80000',
+    textColor: '#ffffff',
+    stations: trainData.predictions.sort((a, b) => a.rawETA - b.rawETA).map((prediction) => {
+      const stationMeta = cpkcHolidayTrainData.stations[prediction.stationID];
+
+      if (!allStations[prediction.stationID]) {
+        allStations[prediction.stationID] = {
+          name: prediction.stationName,
+          code: prediction.stationID,
+          tz: prediction.tz,
+          lat: stationMeta.lat,
+          lon: stationMeta.lon,
+          hasAddress: false,
+          address1: "",
+          address2: "",
+          city: "",
+          state: "",
+          zip: "",
+          trains: [],
+        }
+      }
+
+      allStations[prediction.stationID].trains.push(`CP${trainKey}-25`);
+
+      const arr = new Date(prediction.arr ?? prediction.dep);
+      const dep = new Date(prediction.dep ?? prediction.arr);
+
+      const arrString = arr.toISOString();
+      const depString = dep.toISOString();
+
+      const arrNum = arr.valueOf();
+      const depNum = arr.valueOf();
+
+      const now = Date.now();
+
+      return {
+        name: prediction.stationName,
+        code: prediction.stationID,
+        tz: "America/Chicago",
+        bus: false,
+        schArr: arrString,
+        schDep: depString,
+        arr: arrString,
+        dep: depString,
+        arrCmnt: "",
+        depCmnt: "",
+        status: now < arrNum ? "Enroute" : (
+          now > arrNum && now < depNum ? "Station" : "Departed"
+        ),
+        stopIconColor: "#267300",
+        platform: ""
+      };
+    }),
+    heading: trainData.headingLetter,
+    eventCode: 'CPKC',
+    eventTZ: 'America/Chicago',
+    eventName: 'Christmas',
+    origCode: 'CPKC',
+    originTZ: 'America/Chicago',
+    origName: 'Christmas',
+    destCode: 'CPKC',
+    destTZ: 'America/Chicago',
+    destName: 'Christmas',
+    trainState: "Active",
+    velocity: 0, // no data unfortunately
+    statusMsg: " ",
+    createdAt: cpkcHolidayTrainData['lastUpdated'] ?? new Date().toISOString(),
+    updatedAt: cpkcHolidayTrainData['lastUpdated'] ?? new Date().toISOString(),
+    lastValTS: cpkcHolidayTrainData['lastUpdated'] ?? new Date().toISOString(),
+    objectID: Number(trainKey),
+    provider: "Canadian Pacific Kansas City",
+    providerShort: "CPKC",
+    onlyOfTrainNum: true,
+    alerts: [],
+  };
+
+  const firstStation = train.stations[0];
+  const lastStation = train.stations[train.stations.length - 1];
+  const upcomingStation = train.stations.find((station) => station.status == 'Enroute' || station.status == 'Station') ?? lastStation;
+
+  train.origCode = firstStation.code;
+  train.originTZ = firstStation.tz;
+  train.origName = firstStation.name;
+  train.eventCode = upcomingStation.code;
+  train.eventName = upcomingStation.name;
+  train.eventTZ = upcomingStation.tz;
+  train.destCode = lastStation.code;
+  train.destName = lastStation.name;
+  train.destTZ = lastStation.tz;
+
+  train.stations.push({
+    name: "Christmas",
+    code: "CPKC",
+    tz: "America/Chicago",
+    bus: false,
+    schArr: "2025-12-25T00:00:00-06:00",
+    schDep: "2025-12-25T00:00:00-06:00",
+    arr: "2025-12-25T00:00:00-06:00",
+    dep: "2025-12-25T00:00:00-06:00",
+    arrCmnt: "",
+    depCmnt: "",
+    status: "Enroute",
+    stopIconColor: "#267300",
+    platform: ""
+  });
+
+  if (!allStations['CPKC']) {
+    allStations['CPKC'] = {
+      name: 'Christmas',
+      code: 'CPKC',
+      tz: 'America/Chicago',
+      lat: 83.29825041784702,
+      lon: -34.49599261128057,
+      hasAddress: true,
+      address1: "This is a work in progress, actual stop times are coming.",
+      address2: "",
+      city: "",
+      state: "",
+      zip: "",
+      trains: [],
+    }
+  }
+
+  allStations['CPKC'].trains.push(`CP${trainKey}-25`);
+
+  trains[`CP${trainKey}`] = [train];
+
+  // END SANTA
+  */
+
   Object.keys(brightlineData['trains']).forEach((trainNum) => {
     const rawTrainData = brightlineData['trains'][trainNum];
 
@@ -386,7 +527,19 @@ const updateTrains = async () => {
     const rawTrainData = viaData[trainNum];
     const actualTrainNum = "v" + trainNum.split(" ")[0];
     if (!rawTrainData.departed) return; //train doesn't exist
-    if (actualTrainNum == "97" || actualTrainNum == "98") return; //covered by amtrak
+    if (actualTrainNum == "v97" || actualTrainNum == "v98") {//covered by amtrak, but we need to add some stops
+      const replacements = {
+        v97: '64',
+        v98: '63',
+      };
+      additionalVIAStops[replacements[actualTrainNum]] = rawTrainData.times.sort(
+        (a, b) =>
+          new Date(a.scheduled).valueOf() -
+          new Date(b.scheduled).valueOf()
+      );
+
+      return;
+    };
 
     const sortedStations = rawTrainData.times.sort(
       (a, b) =>
@@ -597,6 +750,84 @@ const updateTrains = async () => {
       .format(new Date(
         stations[0].schDep));
 
+    // adding in VIA stops, if they exist
+
+    const additionalStations: Array<any> = additionalVIAStops[`${+rawTrainData.TrainNum}`] ?? [];
+    let viaTrainDelay = 0;
+
+    const processedVIAStops = additionalStations.map((station) => {
+      if (!allStations[station.code]) {
+        allStations[station.code] = {
+          name: stationMetaData.viaStationNames[station.code],
+          code: station.code,
+          tz: stationMetaData.viatimeZones[station.code] ?? "America/Toronto",
+          lat: stationMetaData.viaCoords[station.code] ? stationMetaData.viaCoords[station.code][0] : 0,
+          lon: stationMetaData.viaCoords[station.code] ? stationMetaData.viaCoords[station.code][1] : 0,
+          hasAddress: false,
+          address1: "",
+          address2: "",
+          city: "",
+          state: "",
+          zip: "",
+          trains: [],
+        };
+      }
+
+      allStations[station.code].trains.push(`${+rawTrainData.TrainNum}-${originDateOfMonth}`);
+
+      if (station.arrival && station.arrival.estimated) {
+        viaTrainDelay =
+          new Date(station.arrival.estimated).valueOf() -
+          new Date(station.arrival.scheduled).valueOf();
+      }
+
+      const estArr = (station.arrival ?? station.departure)
+        .estimated;
+      const estDep = (station.departure ?? station.arrival)
+        .estimated;
+
+      return {
+        name: stationMetaData.viaStationNames[station.code],
+        code: station.code,
+        tz: stationMetaData.viatimeZones[station.code],
+        bus: false,
+        schArr: (station.arrival ?? station.departure).scheduled,
+        schDep: (station.departure ?? station.arrival).scheduled,
+        arr:
+          estArr ??
+          new Date(
+            new Date(
+              (station.arrival ?? station.departure).scheduled
+            ).valueOf() + viaTrainDelay
+          ),
+        dep:
+          estDep ??
+          new Date(
+            new Date(
+              (station.departure ?? station.arrival).scheduled
+            ).valueOf() + viaTrainDelay
+          ),
+        arrCmnt: "",
+        depCmnt: "",
+        status: station.eta === "ARR" ? "Departed" : "Enroute",
+        stopIconColor: "#212529",
+        platform: "",
+      };
+    });
+
+    if (processedVIAStops.length > 0) {
+      const indexOfVIAStart = stations.findIndex((station) => station.code == processedVIAStops[0].code);
+
+      // removing the first and last stop so we have no dupes
+      processedVIAStops.shift();
+      processedVIAStops.pop();
+
+      // actually inserting the data
+      stations.splice(indexOfVIAStart + 1, 0, ...processedVIAStops);
+    };
+
+    // end of adding via stops
+
     let train: Train = {
       routeName: trainNames[+rawTrainData.TrainNum]
         ? trainNames[+rawTrainData.TrainNum]
@@ -697,10 +928,6 @@ const updateTrains = async () => {
 
   amtrakerCache.setTrains(trains);
   console.log("set trains cache");
-
-
-
-
 };
 
 updateTrains();
