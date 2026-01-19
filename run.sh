@@ -1,4 +1,4 @@
-curl https://bun.sh/install | bash -s -- bun-v1.1.19
+curl https://bun.sh/install | bash -s -- bun-v1.3.0
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 

@@ -46,6 +46,7 @@ let trainPlatforms = {};
 let brightlineData = {};
 let brightlinePlatforms = {};
 let additionalVIAStops = {};
+let additionalVIAAlerts = {};
 
 //https://stackoverflow.com/questions/196972/convert-string-to-title-case-with-javascript
 const title = (str: string) => {
@@ -537,6 +538,7 @@ const updateTrains = async () => {
           new Date(a.scheduled).valueOf() -
           new Date(b.scheduled).valueOf()
       );
+      additionalVIAAlerts[replacements[actualTrainNum]] = rawTrainData.alerts ?? [];
 
       return;
     };
