@@ -652,7 +652,11 @@ const updateTrains = async () => {
       provider: "Via",
       providerShort: "VIA",
       onlyOfTrainNum: true,
-      alerts: (rawTrainData.alerts ?? []).map((alert) => alert.description.en.replaceAll('\n', ' ')),
+      alerts: (rawTrainData.alerts ?? []).map((alert) => {
+        return {
+          message: alert.description.en.replaceAll('\n', ' ')
+        }
+      }),
     };
 
     const calculatedColors = calculateIconColor(train, allStations);
