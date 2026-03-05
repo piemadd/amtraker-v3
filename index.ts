@@ -30,6 +30,7 @@ let lastUpdatedTime = {
   updatedAtChicagoPlain: "Wednesday, December 31, 1969 at 6:00:00 PM CST",
 };
 
+let staleTrainsArr = [];
 let staleData = {
   avgLastUpdate: 0,
   activeTrains: 0,
@@ -199,6 +200,9 @@ const parseRawStation = (rawStation: RawStation, rawTrainNum: String = "", debug
       //console.log(rawStation);
     }
   }
+
+  if (!stationMetaData.stationNames[rawStation.code]) console.log('NO STATION NAME:', rawStation.code);
+  if (!stationMetaData.timeZones[rawStation.code]) console.log('NO STATION TZ:', rawStation.code);
 
   return {
     name: stationMetaData.stationNames[rawStation.code],
@@ -518,6 +522,7 @@ const updateTrains = async () => {
     trains['b' + trainNum].push(train);
 
     if (train.trainState === "Active") {
+      staleTrainsArr.push(['b' + trainNum, nowCleaning - new Date(train.lastValTS).valueOf()])
       staleData.avgLastUpdate +=
         nowCleaning - new Date(train.lastValTS).valueOf();
       staleData.activeTrains++;
@@ -673,6 +678,7 @@ const updateTrains = async () => {
     trains[actualTrainNum].push(train);
 
     if (train.trainState === "Active") {
+      staleTrainsArr.push([actualTrainNum, nowCleaning - new Date(train.lastValTS).valueOf()])
       staleData.avgLastUpdate +=
         nowCleaning - new Date(train.lastValTS).valueOf();
       staleData.activeTrains++;
@@ -898,6 +904,7 @@ const updateTrains = async () => {
     trains[rawTrainData.TrainNum].push(train);
 
     if (train.trainState === "Active") {
+      staleTrainsArr.push([rawTrainData.TrainNum, nowCleaning - new Date(train.lastValTS).valueOf()])
       staleData.avgLastUpdate +=
         nowCleaning - new Date(train.lastValTS).valueOf();
       staleData.activeTrains++;
@@ -919,6 +926,15 @@ const updateTrains = async () => {
       trains[trainNum][i].onlyOfTrainNum = arr.length <= 1; // this should be an == but edge cases be damned
     });
   })
+
+  staleTrainsArr = staleTrainsArr.sort((a, b) => b[1] - a[1]);
+  staleTrainsArr.splice(10); // only keep first 10
+  //staleTrainsArr.reverse();
+
+  staleTrainsArr.forEach((train) => {
+    console.log(...train)
+  })
+  
 
   staleData.avgLastUpdate =
     staleData.avgLastUpdate / staleData.activeTrains;
