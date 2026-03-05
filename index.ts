@@ -283,6 +283,7 @@ const updateTrains = async () => {
   console.log("fetched t");
   const nowCleaning: number = new Date().valueOf();
 
+  staleTrainsArr = [];
   staleData.activeTrains = 0;
   staleData.avgLastUpdate = 0;
   staleData.stale = false;
@@ -522,6 +523,8 @@ const updateTrains = async () => {
     trains['b' + trainNum].push(train);
 
     if (train.trainState === "Active") {
+
+
       staleTrainsArr.push(['b' + trainNum, nowCleaning - new Date(train.lastValTS).valueOf()])
       staleData.avgLastUpdate +=
         nowCleaning - new Date(train.lastValTS).valueOf();
