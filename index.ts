@@ -256,12 +256,12 @@ const updateTrains = async () => {
 
   const amtrakAlertsData = await fetch(
     "https://store.transitstat.us/amtrak_alerts" +
-      (process.env.SUPER_SECRET_CACHE_BUSTING ?? ""),
+      (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : ""),
   ).then((res) => res.json());
 
   const brightlineRes = await fetch(
     "https://store.transitstat.us/brightline" +
-      (process.env.SUPER_SECRET_CACHE_BUSTING ?? ""),
+      (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : ""),
   );
   const rawBrightline = await brightlineRes.json();
   brightlineData = rawBrightline["v1"];
@@ -272,7 +272,7 @@ const updateTrains = async () => {
 
   const allProxiedData: any = await fetch(
     "https://store.transitstat.us/amtrak_fetch_proxy" +
-      (process.env.SUPER_SECRET_CACHE_BUSTING ?? ""),
+      (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : ""),
   ).then((res) => res.json());
   const viaData = allProxiedData.trainDataVIA;
   const stationData =
