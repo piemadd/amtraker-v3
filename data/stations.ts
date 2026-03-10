@@ -2,6 +2,7 @@ export const stationNames = {
   ABE: "Aberdeen",
   ABN: "Absecon",
   ACY: "Atlantic City",
+  AIR: "Castle Air Museum",
   ALY: "Albany",
   ALB: "Albany-Rensselaer",
   ALI: "Albion",
@@ -594,6 +595,7 @@ export const timeZones = {
   ADM: "America/Chicago",
   AGM: "America/New_York",
   AHL: "America/Los_Angeles",
+  AIR: "America/Los_Angeles",
   AKV: "America/New_York",
   AKY: "America/New_York",
   ALA: "America/Detroit",
@@ -1691,6 +1693,7 @@ export const timeZones = {
 };
 
 export const viaStationNames = {
+  MIMI: "Toronto VIA Yard",
   BENN: "Benny",
   ALEX: "Alexandria",
   YONK: "Yonkers",
@@ -2082,6 +2085,7 @@ export const viaStationNames = {
 };
 
 export const viatimeZones = {
+  MIMI: "America/Toronto",
   BENN: "America/Toronto",
   ALEX: "America/Toronto",
   YONK: "America/New_York",
@@ -2473,6 +2477,7 @@ export const viatimeZones = {
 };
 
 export const viaCoords = {
+  MIMI: [43.610556, -79.509444],
   BENN: [46.781815, -81.630163],
   ALEX: [45.31805, -74.639672],
   YONK: [40.9355734276, -73.9025018097],

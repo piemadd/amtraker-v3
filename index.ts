@@ -256,12 +256,16 @@ const updateTrains = async () => {
 
   const amtrakAlertsData = await fetch(
     "https://store.transitstat.us/amtrak_alerts" +
-      (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : ""),
+      (process.env.SUPER_SECRET_CACHE_BUSTING
+        ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}`
+        : ""),
   ).then((res) => res.json());
 
   const brightlineRes = await fetch(
     "https://store.transitstat.us/brightline" +
-      (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : ""),
+      (process.env.SUPER_SECRET_CACHE_BUSTING
+        ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}`
+        : ""),
   );
   const rawBrightline = await brightlineRes.json();
   brightlineData = rawBrightline["v1"];
@@ -272,7 +276,9 @@ const updateTrains = async () => {
 
   const allProxiedData: any = await fetch(
     "https://store.transitstat.us/amtrak_fetch_proxy" +
-      (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : ""),
+      (process.env.SUPER_SECRET_CACHE_BUSTING
+        ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}`
+        : ""),
   ).then((res) => res.json());
   const viaData = allProxiedData.trainDataVIA;
   const stationData =
@@ -645,6 +651,23 @@ const updateTrains = async () => {
             zip: "",
             trains: [],
           };
+
+          if (station.code == "MIMI") { // ill need a better way to do this in the future
+            allStations[station.code] = {
+              name: "Toronto VIA Yard",
+              code: "MIMC",
+              tz: "America/Toronto",
+              lat: 43.610556,
+              lon: 79.509444,
+              hasAddress: true,
+              address1: "1611 Islington Avenue",
+              address2: "",
+              city: "Etobicoke",
+              state: "ON",
+              zip: "M8V 3B6",
+              trains: [],
+            };
+          }
         }
 
         allStations[station.code].trains.push(
