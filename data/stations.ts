@@ -1,4 +1,8 @@
-export const stationNames = {
+interface StationMetaInfo {
+  [key: string]: string;
+}
+
+export const stationNames: StationMetaInfo = {
   ABE: "Aberdeen",
   ABN: "Absecon",
   ACY: "Atlantic City",
@@ -576,7 +580,7 @@ export const stationNames = {
   TLH: "Tallahassee",
 };
 
-export const timeZones = {
+export const timeZones: StationMetaInfo = {
   ABN: "America/New_York",
   ACY: "America/New_York",
   ATO: "America/New_York",

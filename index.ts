@@ -32,7 +32,6 @@ let lastUpdatedTime = {
   updatedAtChicagoPlain: "Wednesday, December 31, 1969 at 6:00:00 PM CST",
 };
 
-let staleTrainsArr = [];
 let staleData = {
   avgLastUpdate: 0,
   activeTrains: 0,
@@ -50,7 +49,7 @@ const amtrakerCache = new cache();
 let decryptedTrainData = "";
 let decryptedStationData = "";
 let AllTTMTrains = "";
-let trainPlatforms = {};
+let trainPlatforms: any = {};
 let brightlineData = {};
 let brightlinePlatforms = {};
 let additionalVIAStops = {};
@@ -64,7 +63,43 @@ const title = (str: string) => {
   );
 };
 
-const ccDegToCardinal = (deg) => {
+// changes key values from the old format to the new format
+const convertLegacyToAllTTM = (train: any) => {
+  let newTrain = {
+    ...train,
+    properties: {},
+  };
+  const oldKeys = Object.keys(train.properties);
+
+  oldKeys.forEach((key) => {
+    newTrain.properties[key.toLowerCase()] = train.properties[key];
+  });
+
+  return newTrain;
+};
+
+// merges feeds together in case a train is missing from one or the other
+const mergeAmtrakFeeds = (mainFeed: any, allTTMFeed: any) => {
+  //return allTTMFeed
+  let finalFeedDict: any = {};
+
+  allTTMFeed.features.forEach((feature: any) => {
+    finalFeedDict[feature.properties.objectid] = feature;
+  });
+
+  mainFeed.features.forEach((feature: any) => {
+    if (!finalFeedDict[feature.properties.OBJECTID])
+      finalFeedDict[feature.properties.OBJECTID] =
+        convertLegacyToAllTTM(feature);
+  });
+
+  return {
+    type: "FeatureCollection",
+    features: Object.values(finalFeedDict),
+  };
+};
+
+const ccDegToCardinal = (deg: number) => {
   const fixedDeg = deg - 45 / 2;
   if (fixedDeg < 0) return "N";
   if (fixedDeg < 45) return "NE";
@@ -83,7 +118,7 @@ const parseDate = (badDate: string | null, code: string | null) => {
   if (badDate == null || code == null) return null;
 
   //first is standard time, second is daylight savings
-  const offsets = {
+  const offsets: any = {
     "America/New_York": ["-05:00", "-04:00"],
     "America/Detroit": ["-05:00", "-04:00"],
     "America/Chicago": ["-06:00", "-05:00"],
@@ -97,7 +132,8 @@ const parseDate = (badDate: string | null, code: string | null) => {
     "America/Vancouver": ["-08:00", "-07:00"],
   };
 
-  const timeZone = stationMetaData.timeZones[code] ?? "America/New_York";
+  const timeZone: string =
+    stationMetaData.timeZones[code] ?? "America/New_York";
 
   try {
     const dateArr = badDate.split(" ");
@@ -143,12 +179,12 @@ const parseDate = (badDate: string | null, code: string | null) => {
 
 const parseRawStation = (
   rawStation: RawStation,
-  rawTrainNum: String = "",
+  rawTrainNum: string = "",
   debug: boolean = false,
 ) => {
   let status: StationStatus;
-  let arr: string;
-  let dep: string;
+  let arr: string | null;
+  let dep: string | null;
 
   const actualCode =
     amtrakStationCodeReplacements[rawStation.code] ?? rawStation.code;
@@ -229,10 +265,13 @@ const parseRawStation = (
     schDep:
       parseDate(rawStation.schdep, rawStation.code) ??
       parseDate(rawStation.scharr, rawStation.code),
+    // @ts-ignore
     arr: arr ?? dep,
+    // @ts-ignore
     dep: dep ?? arr,
     arrCmnt: "",
     depCmnt: "",
+    // @ts-ignore
     status: status,
     stopIconColor: "#212529",
     platform:
@@ -267,7 +306,7 @@ const updateTrains = async () => {
         ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}`
         : ""),
   );
-  const rawBrightline = await brightlineRes.json();
+  const rawBrightline: any = await brightlineRes.json();
   brightlineData = rawBrightline["v1"];
   brightlinePlatforms = rawBrightline["platforms"];
 
@@ -285,14 +324,17 @@ const updateTrains = async () => {
     allProxiedData.trainStations.features.length > 0
       ? allProxiedData.trainStations.features
       : rawStations.features;
-  const amtrakData = allProxiedData.trainDataMain.features;
+  const amtrakData = mergeAmtrakFeeds(
+    allProxiedData.trainDataMain,
+    allProxiedData.trainDataASMAD,
+  ).features;
   AllTTMTrains = JSON.stringify(allProxiedData.trainDataASMAD);
   lastUpdatedTime = allProxiedData.updatedTime;
   decryptedTrainData = JSON.stringify(amtrakData);
   decryptedStationData = JSON.stringify(stationData);
 
   console.log("fetched s");
-  stationData.forEach((station) => {
+  stationData.forEach((station: any) => {
     const actualCode =
       amtrakStationCodeReplacements[station.properties.Code] ??
       station.properties.Code;
@@ -319,7 +361,6 @@ const updateTrains = async () => {
   console.log("fetched t");
   const nowCleaning: number = new Date().valueOf();
 
-  staleTrainsArr = [];
   staleData.activeTrains = 0;
   staleData.avgLastUpdate = 0;
   staleData.stale = false;
@@ -572,10 +613,6 @@ const updateTrains = async () => {
     trains["b" + trainNum].push(train);
 
     if (train.trainState === "Active") {
-      staleTrainsArr.push([
-        "b" + trainNum,
-        nowCleaning - new Date(train.lastValTS).valueOf(),
-      ]);
       staleData.avgLastUpdate +=
         nowCleaning - new Date(train.lastValTS).valueOf();
       staleData.activeTrains++;
@@ -652,7 +689,8 @@ const updateTrains = async () => {
             trains: [],
           };
 
-          if (station.code == "MIMI") { // ill need a better way to do this in the future
+          if (station.code == "MIMI") {
+            // ill need a better way to do this in the future
             allStations[station.code] = {
               name: "Toronto VIA Yard",
               code: "MIMC",
@@ -754,10 +792,6 @@ const updateTrains = async () => {
     trains[actualTrainNum].push(train);
 
     if (train.trainState === "Active") {
-      staleTrainsArr.push([
-        actualTrainNum,
-        nowCleaning - new Date(train.lastValTS).valueOf(),
-      ]);
       staleData.avgLastUpdate +=
         nowCleaning - new Date(train.lastValTS).valueOf();
       staleData.activeTrains++;
@@ -770,7 +804,7 @@ const updateTrains = async () => {
     let rawStations: Array<RawStation> = [];
 
     for (let i = 1; i < 47; i++) {
-      let station = rawTrainData[`Station${i}`];
+      let station = rawTrainData[`station${i}`];
       if (station == undefined || !station) {
         continue;
       } else {
@@ -808,13 +842,13 @@ const updateTrains = async () => {
         }
       }
 
-      const result = parseRawStation(station, rawTrainData.TrainNum); //, rawTrainData.TrainNum == "784");
+      const result = parseRawStation(station, rawTrainData.trainnum); //, rawTrainData.trainnum == "784");
 
       return result;
     });
 
     if (stations.length === 0) {
-      console.log("No stations found for train:", rawTrainData.TrainNum);
+      console.log("No stations found for train:", rawTrainData.trainnum);
       return;
     }
 
@@ -831,22 +865,22 @@ const updateTrains = async () => {
     const actualTrainEventCode =
       amtrakStationCodeReplacements[trainEventCode] ?? trainEventCode;
     const actualOrigCode =
-      amtrakStationCodeReplacements[rawTrainData.OrigCode] ??
-      rawTrainData.OrigCode;
+      amtrakStationCodeReplacements[rawTrainData.origcode] ??
+      rawTrainData.origcode;
     const actualDestCode =
-      amtrakStationCodeReplacements[rawTrainData.DestCode] ??
-      rawTrainData.DestCode;
+      amtrakStationCodeReplacements[rawTrainData.destcode] ??
+      rawTrainData.destcode;
 
     // i hate this more than you do
     const originDateOfMonth = new Intl.DateTimeFormat("en-US", {
-      timeZone: stationMetaData.timeZones[rawTrainData.OrigCode],
+      timeZone: stationMetaData.timeZones[rawTrainData.origcode],
       day: "numeric",
     }).format(new Date(stations[0].schDep));
 
     // adding in VIA stops, if they exist
 
     const additionalStations: Array<any> =
-      additionalVIAStops[`${+rawTrainData.TrainNum}`] ?? [];
+      additionalVIAStops[`${+rawTrainData.trainnum}`] ?? [];
     let viaTrainDelay = 0;
 
     const processedVIAStops = additionalStations.map((station) => {
@@ -872,7 +906,7 @@ const updateTrains = async () => {
       }
 
       allStations[station.code].trains.push(
-        `${+rawTrainData.TrainNum}-${originDateOfMonth}`,
+        `${+rawTrainData.trainnum}-${originDateOfMonth}`,
       );
 
       if (station.arrival && station.arrival.estimated) {
@@ -929,37 +963,37 @@ const updateTrains = async () => {
     // end of adding via stops
 
     let train: Train = {
-      routeName: trainNames[+rawTrainData.TrainNum]
-        ? trainNames[+rawTrainData.TrainNum]
-        : rawTrainData.RouteName,
-      trainNum: `${+rawTrainData.TrainNum}`,
-      trainNumRaw: `${+rawTrainData.TrainNum}`,
-      trainID: `${+rawTrainData.TrainNum}-${originDateOfMonth}`,
+      routeName: trainNames[+rawTrainData.trainnum]
+        ? trainNames[+rawTrainData.trainnum]
+        : rawTrainData.routename,
+      trainNum: `${+rawTrainData.trainnum}`,
+      trainNumRaw: `${+rawTrainData.trainnum}`,
+      trainID: `${+rawTrainData.trainnum}-${originDateOfMonth}`,
       lat: property.geometry.coordinates[1],
       lon: property.geometry.coordinates[0],
       trainTimely: "",
       iconColor: "#212529",
       textColor: "#ffffff",
       stations: stations,
-      heading: rawTrainData.Heading ? rawTrainData.Heading : "N",
+      heading: rawTrainData.Heading ?? "N",
       eventCode: actualTrainEventCode,
       eventTZ: stationMetaData.timeZones[trainEventCode],
       eventName: stationMetaData.stationNames[trainEventCode],
       origCode: actualOrigCode,
-      originTZ: stationMetaData.timeZones[rawTrainData.OrigCode],
-      origName: stationMetaData.stationNames[rawTrainData.OrigCode],
+      originTZ: stationMetaData.timeZones[rawTrainData.origcode],
+      origName: stationMetaData.stationNames[rawTrainData.origcode],
       destCode: actualDestCode,
-      destTZ: stationMetaData.timeZones[rawTrainData.DestCode],
-      destName: stationMetaData.stationNames[rawTrainData.DestCode],
-      trainState: rawTrainData.TrainState,
-      velocity: +rawTrainData.Velocity,
+      destTZ: stationMetaData.timeZones[rawTrainData.destcode],
+      destName: stationMetaData.stationNames[rawTrainData.destcode],
+      trainState: rawTrainData.trainstate,
+      velocity: +rawTrainData.velocity,
       statusMsg:
         stations.filter(
           (station) =>
             !station.arr && !station.dep && station.code === trainEventCode,
         ).length > 0
           ? "SERVICE DISRUPTION"
-          : rawTrainData.StatusMsg,
+          : rawTrainData.statusmsg,
       createdAt:
         parseDate(rawTrainData.created_at, "America/New_York") ??
         parseDate(rawTrainData.updated_at, "America/New_York"),
@@ -967,14 +1001,14 @@ const updateTrains = async () => {
         parseDate(rawTrainData.updated_at, "America/New_York") ??
         parseDate(rawTrainData.created_at, "America/New_York"),
       lastValTS:
-        parseDate(rawTrainData.LastValTS, trainEventCode) ?? stations[0].schDep,
+        parseDate(rawTrainData.lastvalts, trainEventCode) ?? stations[0].schDep,
       objectID: rawTrainData.OBJECTID,
       provider: "Amtrak",
       providerShort: "AMTK",
       onlyOfTrainNum: true,
       alerts:
         amtrakAlertsData["trains"][
-          `${+rawTrainData.TrainNum}-${originDateOfMonth}`
+          `${+rawTrainData.trainnum}-${originDateOfMonth}`
         ] ?? [],
     };
 
@@ -990,14 +1024,10 @@ const updateTrains = async () => {
       };
     });
 
-    if (!trains[rawTrainData.TrainNum]) trains[rawTrainData.TrainNum] = [];
-    trains[rawTrainData.TrainNum].push(train);
+    if (!trains[rawTrainData.trainnum]) trains[rawTrainData.trainnum] = [];
+    trains[rawTrainData.trainnum].push(train);
 
     if (train.trainState === "Active") {
-      staleTrainsArr.push([
-        rawTrainData.TrainNum,
-        nowCleaning - new Date(train.lastValTS).valueOf(),
-      ]);
       staleData.avgLastUpdate +=
         nowCleaning - new Date(train.lastValTS).valueOf();
       staleData.activeTrains++;
@@ -1007,7 +1037,7 @@ const updateTrains = async () => {
   // setting onlyOfTrainNum and deduplicating at the same time
   Object.keys(trains).forEach((trainNum) => {
     // deduplicating trains with the same ID
-    let trainIDs = [];
+    let trainIDs: string[] = [];
     trains[trainNum] = trains[trainNum].filter((train) => {
       if (trainIDs.includes(train.trainID)) return false;
       trainIDs.push(train.trainID);
@@ -1018,14 +1048,6 @@ const updateTrains = async () => {
     trains[trainNum].forEach((train, i, arr) => {
       trains[trainNum][i].onlyOfTrainNum = arr.length <= 1; // this should be an == but edge cases be damned
     });
-  });
-
-  staleTrainsArr = staleTrainsArr.sort((a, b) => b[1] - a[1]);
-  staleTrainsArr.splice(10); // only keep first 10
-  //staleTrainsArr.reverse();
-
-  staleTrainsArr.forEach((train) => {
-    console.log(...train);
   });
 
   staleData.avgLastUpdate = staleData.avgLastUpdate / staleData.activeTrains;
