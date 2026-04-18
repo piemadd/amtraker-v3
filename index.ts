@@ -179,12 +179,13 @@ const parseDate = (badDate: string | null, code: string | null) => {
 
 const parseRawStation = (
   rawStation: RawStation,
+  rawTrain: any,
   rawTrainNum: string = "",
   debug: boolean = false,
 ) => {
   let status: StationStatus;
-  let arr: string | null;
-  let dep: string | null;
+  let arr: string | null = null;
+  let dep: string | null = null;
 
   const actualCode =
     amtrakStationCodeReplacements[rawStation.code] ?? rawStation.code;
@@ -254,17 +255,23 @@ const parseRawStation = (
   if (!stationMetaData.timeZones[rawStation.code])
     console.log("NO STATION TZ:", rawStation.code);
 
+  const schArr =
+    parseDate(rawStation.scharr, rawStation.code) ??
+    parseDate(rawStation.schdep, rawStation.code);
+  const schDep =
+    parseDate(rawStation.schdep, rawStation.code) ??
+    parseDate(rawStation.scharr, rawStation.code);
+
+  if (!arr && rawTrain.trainstate == "Predeparture") arr = schArr;
+  if (!dep && rawTrain.trainstate == "Predeparture") dep = schDep;
+
   return {
     name: stationMetaData.stationNames[rawStation.code],
     code: actualCode,
     tz: stationMetaData.timeZones[rawStation.code],
     bus: rawStation.bus,
-    schArr:
-      parseDate(rawStation.scharr, rawStation.code) ??
-      parseDate(rawStation.schdep, rawStation.code),
-    schDep:
-      parseDate(rawStation.schdep, rawStation.code) ??
-      parseDate(rawStation.scharr, rawStation.code),
+    schArr,
+    schDep,
     // @ts-ignore
     arr: arr ?? dep,
     // @ts-ignore
@@ -842,7 +849,11 @@ const updateTrains = async () => {
         }
       }
 
-      const result = parseRawStation(station, rawTrainData.trainnum); //, rawTrainData.trainnum == "784");
+      const result = parseRawStation(
+        station,
+        rawTrainData,
+        rawTrainData.trainnum,
+      ); //, rawTrainData.trainnum == "784");
 
       return result;
     });
@@ -1031,6 +1042,11 @@ const updateTrains = async () => {
       staleData.avgLastUpdate +=
         nowCleaning - new Date(train.lastValTS).valueOf();
       staleData.activeTrains++;
+    } else if (train.trainState === "Predeparture" && true) {
+      const initialDeparture = new Date(train.stations[0].dep ?? train.stations[0].arr);
+
+      // dont include train if more than an hour until departure
+      if (initialDeparture.valueOf() > nowCleaning + (1000 * 60 * 60)) return;
     }
   });
 
