@@ -50,7 +50,7 @@ let decryptedTrainData = "";
 let decryptedStationData = "";
 let AllTTMTrains = "";
 let trainPlatforms: any = {};
-let brightlineData = {};
+let brightlineData: any = {};
 let brightlinePlatforms = {};
 let additionalVIAStops = {};
 let additionalVIAAlerts = {};
@@ -515,7 +515,11 @@ const updateTrains = async () => {
   Object.keys(brightlineData["trains"]).forEach((trainNum) => {
     const rawTrainData = brightlineData["trains"][trainNum];
 
-    if (!rawTrainData.realTime) return; // train is scheduled and should not be shown on Amtraker
+    if (
+      !rawTrainData.realTime &&
+      nowCleaning < rawTrainData.predictions[0].dep - 1000 * 60 * 60
+    )
+      return; // train is scheduled and should not be shown on Amtraker unless within 1 hour of dep
 
     const firstStation = rawTrainData["predictions"][0];
     const lastStation = rawTrainData["predictions"].slice(-1)[0];
@@ -529,12 +533,20 @@ const updateTrains = async () => {
       trainNum: "b" + trainNum,
       trainNumRaw: trainNum,
       trainID: "b" + trainNum + "-" + new Date(firstStation.dep).getDate(),
-      lat: rawTrainData["lat"],
-      lon: rawTrainData["lon"],
+      lat:
+        rawTrainData.lat != 0
+          ? rawTrainData.lat
+          : brightlineData["stations"][rawTrainData.predictions[0].stationID]
+              .lat,
+      lon:
+        rawTrainData.lon != 0
+          ? rawTrainData.lon
+          : brightlineData["stations"][rawTrainData.predictions[0].stationID]
+              .lon,
       trainTimely: "",
       iconColor: "#212529",
       textColor: "#ffffff",
-      stations: rawTrainData.predictions.map((prediction) => {
+      stations: rawTrainData.predictions.map((prediction: any) => {
         const actualID = "B" + prediction.stationID;
         if (!allStations[actualID]) {
           allStations[actualID] = {
@@ -1035,6 +1047,18 @@ const updateTrains = async () => {
       };
     });
 
+    if (train.trainState === "Predeparture" && true) {
+      const initialDeparture = new Date(
+        train.stations[0].dep ?? train.stations[0].arr,
+      );
+
+      // dont include train if more than an hour until departure
+      if (initialDeparture.valueOf() > nowCleaning + 1000 * 60 * 60) return;
+      if (train.trainID == "508-19") {
+        console.log(initialDeparture, new Date(nowCleaning));
+      }
+    }
+
     if (!trains[rawTrainData.trainnum]) trains[rawTrainData.trainnum] = [];
     trains[rawTrainData.trainnum].push(train);
 
@@ -1042,11 +1066,6 @@ const updateTrains = async () => {
       staleData.avgLastUpdate +=
         nowCleaning - new Date(train.lastValTS).valueOf();
       staleData.activeTrains++;
-    } else if (train.trainState === "Predeparture" && true) {
-      const initialDeparture = new Date(train.stations[0].dep ?? train.stations[0].arr);
-
-      // dont include train if more than an hour until departure
-      if (initialDeparture.valueOf() > nowCleaning + (1000 * 60 * 60)) return;
     }
   });
 
@@ -1278,6 +1297,86 @@ Bun.serve({
       return new Response(
         JSON.stringify({
           [trainNum]: trains[trainNum],
+        }),
+        {
+          headers: {
+            "Access-Control-Allow-Origin": "*", // CORS
+            "content-type": "application/json",
+          },
+        },
+      );
+    }
+
+    if (url.startsWith("/v3/stations/expanded")) {
+      const stationCode = url.split("/")[4];
+      const stations = amtrakerCache.getStations();
+      const trains = amtrakerCache.getTrains();
+
+      if (stationCode === undefined || stations[stationCode] == null) {
+        return new Response(JSON.stringify([]), {
+          headers: {
+            "Access-Control-Allow-Origin": "*", // CORS
+            "content-type": "application/json",
+          },
+        });
+      }
+
+      const newStation = {
+        ...stations[stationCode],
+        trains: stations[stationCode].trains.map((trainID) => {
+          const trainsArr = trains[trainID.split("-")[0]];
+          const train = trainsArr.find((train) => train.trainID == trainID);
+
+          const thisStationFull = train?.stations.find(
+            (station) => station.code == stationCode,
+          );
+          const thisStationMin = {
+            schArr: thisStationFull?.schArr,
+            schDep: thisStationFull?.schDep,
+            arr: thisStationFull?.arr,
+            dep: thisStationFull?.dep,
+            status: thisStationFull?.status,
+            stopIconColor: thisStationFull?.stopIconColor,
+            platform: thisStationFull?.platform,
+          };
+
+          return {
+            routeName: train?.routeName,
+            trainNum: train?.trainNum,
+            trainNumRaw: train?.trainNumRaw,
+            trainID: train?.trainID,
+            lat: train?.lat,
+            lon: train?.lon,
+            iconColor: train?.iconColor,
+            textColor: train?.textColor,
+            thisStationMin: thisStationMin,
+            heading: train?.heading,
+            eventCode: train?.eventCode,
+            eventTZ: train?.eventTZ,
+            eventName: train?.eventName,
+            origCode: train?.origCode,
+            originTZ: train?.originTZ,
+            origName: train?.origName,
+            destCode: train?.destCode,
+            destTZ: train?.destTZ,
+            destName: train?.destName,
+            trainState: train?.trainState,
+            velocity: train?.velocity,
+            statusMsg: train?.statusMsg,
+            createdAt: train?.createdAt,
+            updatedAt: train?.updatedAt,
+            lastValTS: train?.lastValTS,
+            provider: train?.provider,
+            providerShort: train?.providerShort,
+            onlyOfTrainNum: train?.onlyOfTrainNum,
+            alerts: train?.alerts,
+          };
+        }),
+      };
+
+      return new Response(
+        JSON.stringify({
+          [stationCode]: newStation,
         }),
         {
           headers: {
