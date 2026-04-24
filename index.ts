@@ -716,7 +716,7 @@ const updateTrains = async () => {
               name: "Toronto VIA Yard",
               code: "MIMC",
               tz: "America/Toronto",
-              lat: 43.610556,
+              lat: -43.610556,
               lon: 79.509444,
               hasAddress: true,
               address1: "1611 Islington Avenue",
