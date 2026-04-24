@@ -635,6 +635,8 @@ const updateTrains = async () => {
       staleData.avgLastUpdate +=
         nowCleaning - new Date(train.lastValTS).valueOf();
       staleData.activeTrains++;
+
+      console.log(train.trainNum, train.lastValTS, nowCleaning - new Date(train.lastValTS).valueOf(), nowCleaning - new Date(train.lastValTS).valueOf() > (1000 * 60 * 15))
     }
   });
 
@@ -708,7 +710,7 @@ const updateTrains = async () => {
             trains: [],
           };
 
-          if (station.code == "MIMI") {
+          if (station.code == "MIMC") {
             // ill need a better way to do this in the future
             allStations[station.code] = {
               name: "Toronto VIA Yard",
@@ -814,6 +816,8 @@ const updateTrains = async () => {
       staleData.avgLastUpdate +=
         nowCleaning - new Date(train.lastValTS).valueOf();
       staleData.activeTrains++;
+
+      console.log(train.trainNum, train.lastValTS, nowCleaning - new Date(train.lastValTS).valueOf(), nowCleaning - new Date(train.lastValTS).valueOf() > (1000 * 60 * 15))
     }
   });
 
@@ -1066,6 +1070,8 @@ const updateTrains = async () => {
       staleData.avgLastUpdate +=
         nowCleaning - new Date(train.lastValTS).valueOf();
       staleData.activeTrains++;
+
+      console.log(train.trainID, train.lastValTS, nowCleaning - new Date(train.lastValTS).valueOf(), nowCleaning - new Date(train.lastValTS).valueOf() > (1000 * 60 * 15))
     }
   });
 
