@@ -84,12 +84,12 @@ const mergeAmtrakFeeds = (mainFeed: any, allTTMFeed: any) => {
   let finalFeedDict: any = {};
 
   allTTMFeed.features.forEach((feature: any) => {
-    finalFeedDict[feature.properties.objectid] = feature;
+    finalFeedDict[`${feature.properties.trainnum}-${feature.properties.origschdep}`] = feature;
   });
 
   mainFeed.features.forEach((feature: any) => {
-    if (!finalFeedDict[feature.properties.OBJECTID])
-      finalFeedDict[feature.properties.OBJECTID] =
+    if (!finalFeedDict[`${feature.properties.TrainNum}-${feature.properties.OrigSchDep}`])
+      finalFeedDict[`${feature.properties.TrainNum}-${feature.properties.OrigSchDep}`] =
         convertLegacyToAllTTM(feature);
   });
 
@@ -636,7 +636,7 @@ const updateTrains = async () => {
         nowCleaning - new Date(train.lastValTS).valueOf();
       staleData.activeTrains++;
 
-      console.log(train.trainNum, train.lastValTS, nowCleaning - new Date(train.lastValTS).valueOf(), nowCleaning - new Date(train.lastValTS).valueOf() > (1000 * 60 * 15))
+      //console.log(train.trainNum, train.lastValTS, nowCleaning - new Date(train.lastValTS).valueOf(), nowCleaning - new Date(train.lastValTS).valueOf() > (1000 * 60 * 15))
     }
   });
 
@@ -817,12 +817,14 @@ const updateTrains = async () => {
         nowCleaning - new Date(train.lastValTS).valueOf();
       staleData.activeTrains++;
 
-      console.log(train.trainNum, train.lastValTS, nowCleaning - new Date(train.lastValTS).valueOf(), nowCleaning - new Date(train.lastValTS).valueOf() > (1000 * 60 * 15))
+      //console.log(train.trainNum, train.lastValTS, nowCleaning - new Date(train.lastValTS).valueOf(), nowCleaning - new Date(train.lastValTS).valueOf() > (1000 * 60 * 15))
     }
   });
 
-  amtrakData.forEach((property) => {
+  amtrakData.forEach((property: any) => {
     let rawTrainData = property.properties;
+
+    //console.log(rawTrainData.trainnum)
 
     let rawStations: Array<RawStation> = [];
 
@@ -1038,6 +1040,7 @@ const updateTrains = async () => {
           `${+rawTrainData.trainnum}-${originDateOfMonth}`
         ] ?? [],
     };
+    //console.log(train.trainID, train.trainNum, train.trainState)
 
     const calculatedColors = calculateIconColor(train, allStations);
     train.iconColor = calculatedColors["color"];
@@ -1058,9 +1061,6 @@ const updateTrains = async () => {
 
       // dont include train if more than an hour until departure
       if (initialDeparture.valueOf() > nowCleaning + 1000 * 60 * 60) return;
-      if (train.trainID == "508-19") {
-        console.log(initialDeparture, new Date(nowCleaning));
-      }
     }
 
     if (!trains[rawTrainData.trainnum]) trains[rawTrainData.trainnum] = [];
@@ -1071,7 +1071,7 @@ const updateTrains = async () => {
         nowCleaning - new Date(train.lastValTS).valueOf();
       staleData.activeTrains++;
 
-      console.log(train.trainID, train.lastValTS, nowCleaning - new Date(train.lastValTS).valueOf(), nowCleaning - new Date(train.lastValTS).valueOf() > (1000 * 60 * 15))
+      //console.log(train.trainID, train.lastValTS, nowCleaning - new Date(train.lastValTS).valueOf(), nowCleaning - new Date(train.lastValTS).valueOf() > (1000 * 60 * 15))
     }
   });
 
@@ -1116,9 +1116,6 @@ Bun.serve({
   port: process.env.PORT ?? 3001,
   fetch(request) {
     let url = new URL(request.url).pathname;
-
-    console.log(request.url);
-    console.log(url);
 
     if (url.startsWith("/v2")) {
       url = url.replace("/v2", "/v3");
@@ -1215,7 +1212,7 @@ Bun.serve({
     }
 
     if (url.startsWith("/v3/ids")) {
-      console.log("train ids");
+      console.log(request.url, url, "train ids");
       const trainIDs = amtrakerCache.getIDs();
       return new Response(JSON.stringify(trainIDs), {
         headers: {
@@ -1231,7 +1228,7 @@ Bun.serve({
       const trains = amtrakerCache.getTrains();
 
       if (trainNum === undefined) {
-        console.log("all trains");
+        console.log(request.url, url, "all trains");
         return new Response(JSON.stringify(trains), {
           headers: {
             "Access-Control-Allow-Origin": "*", // CORS
@@ -1241,7 +1238,7 @@ Bun.serve({
       }
 
       if (trainNum === "arr") {
-        console.log("all trains in an array");
+        console.log(request.url, url, "all trains in an array");
         return new Response(
           JSON.stringify({
             0: Object.values(trains).flatMap((n) => n),
@@ -1255,7 +1252,7 @@ Bun.serve({
         );
       }
 
-      console.log("train num", trainNum);
+      console.log(request.url, url, "train num", trainNum);
 
       if (trainNum.split("-").length === 2) {
         const trainsArr = trains[trainNum.split("-")[0]];
@@ -1398,7 +1395,7 @@ Bun.serve({
       const stations = amtrakerCache.getStations();
 
       if (stationCode === undefined) {
-        console.log("stations");
+        console.log(request.url, url, "stations");
         return new Response(JSON.stringify(stations), {
           headers: {
             "Access-Control-Allow-Origin": "*", // CORS
