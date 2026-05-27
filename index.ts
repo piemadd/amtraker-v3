@@ -1102,7 +1102,7 @@ const server = Bun.serve({
 
       if (trainNum === undefined) {
         console.log(request.url, url, "all trains");
-        return new Response(JSON.stringify(trains), {
+        return new Response(JSON.stringify(finalTrains), {
           headers: {
             "Access-Control-Allow-Origin": "*", // CORS
             "content-type": "application/json"
