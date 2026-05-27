@@ -472,6 +472,7 @@ const updateTrains = async () => {
       rawTrainData["predictions"].filter((station) => station.dep >= Date.now())[0] ?? lastStation;
 
     let train: Train = {
+      dataSource: 'amtraker-v3',
       routeName: "Brightline",
       trainNum: "b" + trainNum,
       trainNumRaw: trainNum,
@@ -594,6 +595,7 @@ const updateTrains = async () => {
     let trainDelay = 0;
 
     let train: Train = {
+      dataSource: 'amtraker-v3',
       routeName: viaTrainNames[trainNum.split(" ")[0]] ?? `${title(rawTrainData.from)}-${title(rawTrainData.to)}`,
       trainNum: `${actualTrainNum}`,
       trainNumRaw: trainNum.split(" ")[0],
@@ -840,6 +842,7 @@ const updateTrains = async () => {
     // end of adding via stops
 
     let train: Train = {
+      dataSource: 'amtraker-v3',
       routeName: trainNames[+rawTrainData.trainnum] ? trainNames[+rawTrainData.trainnum] : rawTrainData.routename,
       trainNum: `${+rawTrainData.trainnum}`,
       trainNumRaw: `${+rawTrainData.trainnum}`,
