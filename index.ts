@@ -971,9 +971,9 @@ const server = Bun.serve({
     if (url === `/v3/ips` && request.url.endsWith(process.env.SUPER_SECRET_ACCESS_KEY)) {
       //console.log(request.headers)
 
-      console.log(ipAddr, request.headers.get("x-real-ip"), request.headers)
+      //console.log(ipAddr, request.headers.get("x-real-ip"), request.headers)
 
-      return new Response(JSON.stringify({ topIPs }), { headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify(Object.keys(topIPs).map((key) => [key, topIPs[key]]).sort((a, b) => b[1] - a[1])), { headers: { "content-type": "application/json" } });
     }
 
     if (url === "/v3/all") {
