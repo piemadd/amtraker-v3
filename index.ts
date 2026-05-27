@@ -1089,6 +1089,17 @@ const server = Bun.serve({
 
       const trains = amtrakerCache.getTrains();
 
+      let finalTrains = {};
+
+      Object.keys(trains).forEach((trainNum) => {
+        finalTrains[trainNum] = trains[trainNum].map((train) => {
+          return {
+            ...train,
+            dataSource: 'amtraker-v3-trains',
+          }
+        })
+      })
+
       if (trainNum === undefined) {
         console.log(request.url, url, "all trains");
         return new Response(JSON.stringify(trains), {
