@@ -986,18 +986,7 @@ const server = Bun.serve({
       const stations = amtrakerCache.getStations();
       const ids = amtrakerCache.getIDs();
 
-      let finalTrains = {};
-
-      Object.keys(trains).forEach((trainNum) => {
-        finalTrains[trainNum] = trains[trainNum].map((train) => {
-          return {
-            ...train,
-            dataSource: 'amtraker-v3-all',
-          }
-        })
-      })
-
-      return new Response(JSON.stringify({ trains: finalTrains, stations, ids, shitsFucked, staleData: servedStaleData }), {
+      return new Response(JSON.stringify({ trains, stations, ids, shitsFucked, staleData: servedStaleData }), {
         headers: {
           "Access-Control-Allow-Origin": "*", // CORS
           "content-type": "application/json"
@@ -1096,6 +1085,7 @@ const server = Bun.serve({
           return {
             ...train,
             dataSource: 'amtraker-v3-trains',
+            ipSource: ipAddr,
           }
         })
       })
