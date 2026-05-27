@@ -472,7 +472,7 @@ const updateTrains = async () => {
       rawTrainData["predictions"].filter((station) => station.dep >= Date.now())[0] ?? lastStation;
 
     let train: Train = {
-      dataSource: 'amtraker-v3',
+      dataSource: "amtraker-v3",
       routeName: "Brightline",
       trainNum: "b" + trainNum,
       trainNumRaw: trainNum,
@@ -595,7 +595,7 @@ const updateTrains = async () => {
     let trainDelay = 0;
 
     let train: Train = {
-      dataSource: 'amtraker-v3',
+      dataSource: "amtraker-v3",
       routeName: viaTrainNames[trainNum.split(" ")[0]] ?? `${title(rawTrainData.from)}-${title(rawTrainData.to)}`,
       trainNum: `${actualTrainNum}`,
       trainNumRaw: trainNum.split(" ")[0],
@@ -842,7 +842,7 @@ const updateTrains = async () => {
     // end of adding via stops
 
     let train: Train = {
-      dataSource: 'amtraker-v3',
+      dataSource: "amtraker-v3",
       routeName: trainNames[+rawTrainData.trainnum] ? trainNames[+rawTrainData.trainnum] : rawTrainData.routename,
       trainNum: `${+rawTrainData.trainnum}`,
       trainNumRaw: `${+rawTrainData.trainnum}`,
@@ -957,14 +957,17 @@ const cleanUpIPs = () => {
 
 setInterval(() => cleanUpIPs(), 300 * 1000);
 
-const blocks = ['2600:1f10:40b2:b00:ebe6:6636:a8da:f1af'];
+const blocks = ["2600:1f10:40b2:b00:ebe6:6636:a8da:f1af"];
 
 const server = Bun.serve({
   port: process.env.PORT ?? 3001,
   fetch(request) {
     const ipAddr = request.headers.get("cf-connecting-ip") ?? server.requestIP(request).address;
+    let shouldBlock = false;
 
     if (blocks.includes(ipAddr)) {
+      shouldBlock = true;
+      /*
       return new Response(JSON.stringify([]), {
         headers: {
           "Access-Control-Allow-Origin": "*", // CORS
@@ -973,6 +976,7 @@ const server = Bun.serve({
         },
         status: 403,
       });
+      */
     }
 
     if (!topIPs[ipAddr]) topIPs[ipAddr] = { count: 0, headers: Object.fromEntries(request.headers) };
@@ -989,9 +993,14 @@ const server = Bun.serve({
 
       //console.log(ipAddr, request.headers.get("x-real-ip"), request.headers)
 
-      return new Response(JSON.stringify(Object.keys(topIPs).sort((a, b) => topIPs[b].count - topIPs[a].count).map((ip) => [ip, topIPs[ip].count, topIPs[ip].headers])), {
-        headers: { "content-type": "application/json" }
-      });
+      return new Response(
+        JSON.stringify(
+          Object.keys(topIPs)
+            .sort((a, b) => topIPs[b].count - topIPs[a].count)
+            .map((ip) => [ip, topIPs[ip].count, topIPs[ip].headers])
+        ),
+        { headers: { "content-type": "application/json" } }
+      );
     }
 
     if (url === "/v3/all") {
@@ -1093,6 +1102,7 @@ const server = Bun.serve({
 
       let finalTrains = {};
 
+      /*
       Object.keys(trains).forEach((trainNum) => {
         finalTrains[trainNum] = trains[trainNum].map((train) => {
           return {
@@ -1102,10 +1112,23 @@ const server = Bun.serve({
           }
         })
       })
+        */
 
       if (trainNum === undefined) {
         console.log(request.url, url, "all trains");
-        return new Response(JSON.stringify(finalTrains), {
+
+        if (shouldBlock) {
+          return new Response(JSON.stringify({}), {
+            headers: {
+              "Access-Control-Allow-Origin": "*", // CORS
+              "content-type": "application/json",
+              attribution:
+                "Please provide proper attribution to Amtraker on your website and email me (amtraker@piemadd.com) to have this block removed."
+            }
+          });
+        }
+
+        return new Response(JSON.stringify(trains), {
           headers: {
             "Access-Control-Allow-Origin": "*", // CORS
             "content-type": "application/json"
