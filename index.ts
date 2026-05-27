@@ -957,7 +957,7 @@ setInterval(() => cleanUpIPs(), 300 * 1000);
 const server = Bun.serve({
   port: process.env.PORT ?? 3001,
   fetch(request) {
-    const ipAddr = server.requestIP(request).address ?? request.headers["CF-Connecting-IP"];
+    const ipAddr = request.headers["CF-Connecting-IP"] ?? server.requestIP(request).address;
 
     if (!topIPs[ipAddr]) topIPs[ipAddr] = 0;
     topIPs[ipAddr]++;
