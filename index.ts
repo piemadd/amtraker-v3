@@ -957,10 +957,23 @@ const cleanUpIPs = () => {
 
 setInterval(() => cleanUpIPs(), 300 * 1000);
 
+const blocks = ['2600:1f10:40b2:b00:ebe6:6636:a8da:f1af'];
+
 const server = Bun.serve({
   port: process.env.PORT ?? 3001,
   fetch(request) {
     const ipAddr = request.headers.get("cf-connecting-ip") ?? server.requestIP(request).address;
+
+    if (blocks.includes(ipAddr)) {
+      return new Response(JSON.stringify([]), {
+        headers: {
+          "Access-Control-Allow-Origin": "*", // CORS
+          "content-type": "application/json",
+          'attribution': "Please provide proper attribution to Amtraker on your website and email me (amtraker@piemadd.com) to have this block removed."
+        },
+        status: 403,
+      });
+    }
 
     if (!topIPs[ipAddr]) topIPs[ipAddr] = { count: 0, headers: Object.fromEntries(request.headers) };
     topIPs[ipAddr].count++;
