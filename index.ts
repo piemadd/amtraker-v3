@@ -945,8 +945,8 @@ setInterval(() => updateTrains(), 1000 * 15); // every 15 seconds
 
 const cleanUpIPs = () => {
   Object.keys(topIPs)
-    .sort((a, b) => topIPs[b] - topIPs[a])
-    .slice(25)
+    .sort((a, b) => topIPs[b].count - topIPs[a].count)
+    .slice(50)
     .forEach((ip) => {
       delete topIPs[ip];
     });
@@ -959,8 +959,8 @@ const server = Bun.serve({
   fetch(request) {
     const ipAddr = request.headers.get("cf-connecting-ip") ?? server.requestIP(request).address;
 
-    if (!topIPs[ipAddr]) topIPs[ipAddr] = 0;
-    topIPs[ipAddr]++;
+    if (!topIPs[ipAddr]) topIPs[ipAddr] = { count: 0, headers: Object.fromEntries(request.headers) };
+    topIPs[ipAddr].count++;
 
     let url = new URL(request.url).pathname;
 
@@ -973,7 +973,9 @@ const server = Bun.serve({
 
       //console.log(ipAddr, request.headers.get("x-real-ip"), request.headers)
 
-      return new Response(JSON.stringify(Object.keys(topIPs).map((key) => [key, topIPs[key]]).sort((a, b) => b[1] - a[1])), { headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify(Object.keys(topIPs).sort((a, b) => topIPs[b].count - topIPs[a].count).map((ip) => [ip, topIPs[ip].count, topIPs[ip].headers])), {
+        headers: { "content-type": "application/json" }
+      });
     }
 
     if (url === "/v3/all") {
