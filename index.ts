@@ -1118,14 +1118,69 @@ const server = Bun.serve({
         console.log(request.url, url, "all trains");
 
         if (shouldBlock) {
-          return new Response(JSON.stringify({}), {
-            headers: {
-              "Access-Control-Allow-Origin": "*", // CORS
-              "content-type": "application/json",
-              attribution:
-                "Please provide proper attribution to Amtraker on your website and email me (amtraker@piemadd.com) to have this block removed."
+          return new Response(
+            JSON.stringify({
+              "9997": [
+                {
+                  dataSource: "amtraker-v3",
+                  routeName: "Error Train",
+                  trainNum: "9997",
+                  trainNumRaw: "9997",
+                  trainID: "9997-1",
+                  lat: 0,
+                  lon: 0,
+                  trainTimely: "",
+                  iconColor: "#000000",
+                  textColor: "#ffffff",
+                  stations: [
+                    {
+                      name: "Chicago Union",
+                      code: "CHI",
+                      tz: "America/Chicago",
+                      bus: false,
+                      schArr: "2030-05-01T01:00:00-05:00",
+                      schDep: "2030-05-01T01:00:00-05:00",
+                      arr: "2030-05-01T01:00:00-05:00",
+                      dep: "2030-05-01T01:00:00-05:00",
+                      arrCmnt: "",
+                      depCmnt: "",
+                      status: "Enroute",
+                      stopIconColor: "#2a893d",
+                      platform: ""
+                    }
+                  ],
+                  heading: "N",
+                  eventCode: "CHI",
+                  eventTZ: "America/Chicago",
+                  eventName: "Chicago Union",
+                  origCode: "CHI",
+                  originTZ: "America/Chicago",
+                  origName: "Chicago Union",
+                  destCode: "CHI",
+                  destTZ: "America/Chicago",
+                  destName: "Chicago Union",
+                  trainState: "Active",
+                  velocity: 0,
+                  statusMsg: " ",
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  lastValTS: new Date().toISOString(),
+                  provider: "Amtrak",
+                  providerShort: "AMTK",
+                  onlyOfTrainNum: true,
+                  alerts: []
+                }
+              ]
+            }),
+            {
+              headers: {
+                "Access-Control-Allow-Origin": "*", // CORS
+                "content-type": "application/json",
+                attribution:
+                  "Please provide proper attribution to Amtraker on your website and email me (amtraker@piemadd.com) to have this block removed."
+              }
             }
-          });
+          );
         }
 
         return new Response(JSON.stringify(trains), {
