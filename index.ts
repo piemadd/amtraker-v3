@@ -970,6 +970,9 @@ const server = Bun.serve({
 
     if (url === `/v3/ips` && request.url.endsWith(process.env.SUPER_SECRET_ACCESS_KEY)) {
       //console.log(request.headers)
+
+      console.log(ipAddr, request.headers["cf-connecting-ip"])
+
       return new Response(JSON.stringify({ topIPs }), { headers: { "content-type": "application/json" } });
     }
 
