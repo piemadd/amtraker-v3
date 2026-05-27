@@ -957,7 +957,7 @@ setInterval(() => cleanUpIPs(), 300 * 1000);
 const server = Bun.serve({
   port: process.env.PORT ?? 3001,
   fetch(request) {
-    const ipAddr = request.headers["CF-Connecting-IP"] ?? server.requestIP(request).address;
+    const ipAddr = request.headers["cf-connecting-ip"] ?? server.requestIP(request).address;
 
     if (!topIPs[ipAddr]) topIPs[ipAddr] = 0;
     topIPs[ipAddr]++;
@@ -969,7 +969,7 @@ const server = Bun.serve({
     }
 
     if (url === `/v3/ips` && request.url.endsWith(process.env.SUPER_SECRET_ACCESS_KEY)) {
-      console.log(request.headers)
+      //console.log(request.headers)
       return new Response(JSON.stringify({ topIPs }), { headers: { "content-type": "application/json" } });
     }
 
