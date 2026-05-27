@@ -7,41 +7,25 @@ import { XMLBuilder } from "fast-xml-parser";
 const xmlBuilder = new XMLBuilder();
 
 import { RawStation } from "./types/amtrak";
-import {
-  Train,
-  Station,
-  StationStatus,
-  TrainResponse,
-  StationResponse,
-} from "./types/amtraker";
+import { Train, Station, StationStatus, TrainResponse, StationResponse } from "./types/amtraker";
 
 import { trainNames, viaTrainNames } from "./data/trains";
 import * as stationMetaData from "./data/stations";
 import { amtrakStationCodeReplacements } from "./data/sharedStations";
 import cache from "./cache";
 
-const rawStations = JSON.parse(
-  fs.readFileSync("./rawStations.json", { encoding: "utf8" }),
-);
+const rawStations = JSON.parse(fs.readFileSync("./rawStations.json", { encoding: "utf8" }));
 
 import calculateIconColor from "./calculateIconColor";
 
 let lastUpdatedTime = {
   updatedAt: 0,
   updatedAtISO: "1970-01-01T00:00:00.000Z",
-  updatedAtChicagoPlain: "Wednesday, December 31, 1969 at 6:00:00 PM CST",
+  updatedAtChicagoPlain: "Wednesday, December 31, 1969 at 6:00:00 PM CST"
 };
 
-let staleData = {
-  avgLastUpdate: 0,
-  activeTrains: 0,
-  stale: false,
-};
-let servedStaleData = {
-  avgLastUpdate: 0,
-  activeTrains: 0,
-  stale: false,
-};
+let staleData = { avgLastUpdate: 0, activeTrains: 0, stale: false };
+let servedStaleData = { avgLastUpdate: 0, activeTrains: 0, stale: false };
 
 let shitsFucked = false;
 
@@ -55,20 +39,16 @@ let brightlinePlatforms = {};
 let additionalVIAStops = {};
 let additionalVIAAlerts = {};
 
+let topIPs = {};
+
 //https://stackoverflow.com/questions/196972/convert-string-to-title-case-with-javascript
 const title = (str: string) => {
-  return str.replace(
-    /\w\S*/g,
-    (text) => text.charAt(0).toUpperCase() + text.substring(1).toLowerCase(),
-  );
+  return str.replace(/\w\S*/g, (text) => text.charAt(0).toUpperCase() + text.substring(1).toLowerCase());
 };
 
 // changes key values from the old format to the new format
 const convertLegacyToAllTTM = (train: any) => {
-  let newTrain = {
-    ...train,
-    properties: {},
-  };
+  let newTrain = { ...train, properties: {} };
   const oldKeys = Object.keys(train.properties);
 
   oldKeys.forEach((key) => {
@@ -89,14 +69,10 @@ const mergeAmtrakFeeds = (mainFeed: any, allTTMFeed: any) => {
 
   mainFeed.features.forEach((feature: any) => {
     if (!finalFeedDict[`${feature.properties.TrainNum}-${feature.properties.OrigSchDep}`])
-      finalFeedDict[`${feature.properties.TrainNum}-${feature.properties.OrigSchDep}`] =
-        convertLegacyToAllTTM(feature);
+      finalFeedDict[`${feature.properties.TrainNum}-${feature.properties.OrigSchDep}`] = convertLegacyToAllTTM(feature);
   });
 
-  return {
-    type: "FeatureCollection",
-    features: Object.values(finalFeedDict),
-  };
+  return { type: "FeatureCollection", features: Object.values(finalFeedDict) };
 };
 
 const ccDegToCardinal = (deg: number) => {
@@ -129,11 +105,10 @@ const parseDate = (badDate: string | null, code: string | null) => {
     "America/Toronto": ["-05:00", "-04:00"],
     "America/Indiana/Indianapolis": ["-05:00", "-04:00"],
     "America/Kentucky/Louisville": ["-05:00", "-04:00"],
-    "America/Vancouver": ["-08:00", "-07:00"],
+    "America/Vancouver": ["-08:00", "-07:00"]
   };
 
-  const timeZone: string =
-    stationMetaData.timeZones[code] ?? "America/New_York";
+  const timeZone: string = stationMetaData.timeZones[code] ?? "America/New_York";
 
   try {
     const dateArr = badDate.split(" ");
@@ -177,18 +152,12 @@ const parseDate = (badDate: string | null, code: string | null) => {
   }
 };
 
-const parseRawStation = (
-  rawStation: RawStation,
-  rawTrain: any,
-  rawTrainNum: string = "",
-  debug: boolean = false,
-) => {
+const parseRawStation = (rawStation: RawStation, rawTrain: any, rawTrainNum: string = "", debug: boolean = false) => {
   let status: StationStatus;
   let arr: string | null = null;
   let dep: string | null = null;
 
-  const actualCode =
-    amtrakStationCodeReplacements[rawStation.code] ?? rawStation.code;
+  const actualCode = amtrakStationCodeReplacements[rawStation.code] ?? rawStation.code;
 
   if (!rawStation.scharr && !rawStation.postarr) {
     //first station
@@ -250,17 +219,11 @@ const parseRawStation = (
     }
   }
 
-  if (!stationMetaData.stationNames[rawStation.code])
-    console.log("NO STATION NAME:", rawStation.code);
-  if (!stationMetaData.timeZones[rawStation.code])
-    console.log("NO STATION TZ:", rawStation.code);
+  if (!stationMetaData.stationNames[rawStation.code]) console.log("NO STATION NAME:", rawStation.code);
+  if (!stationMetaData.timeZones[rawStation.code]) console.log("NO STATION TZ:", rawStation.code);
 
-  const schArr =
-    parseDate(rawStation.scharr, rawStation.code) ??
-    parseDate(rawStation.schdep, rawStation.code);
-  const schDep =
-    parseDate(rawStation.schdep, rawStation.code) ??
-    parseDate(rawStation.scharr, rawStation.code);
+  const schArr = parseDate(rawStation.scharr, rawStation.code) ?? parseDate(rawStation.schdep, rawStation.code);
+  const schDep = parseDate(rawStation.schdep, rawStation.code) ?? parseDate(rawStation.scharr, rawStation.code);
 
   if (!arr && rawTrain.trainstate == "Predeparture") arr = schArr;
   if (!dep && rawTrain.trainstate == "Predeparture") dep = schDep;
@@ -282,10 +245,9 @@ const parseRawStation = (
     status: status,
     stopIconColor: "#212529",
     platform:
-      trainPlatforms[rawStation.code] &&
-      trainPlatforms[rawStation.code][rawTrainNum]
+      trainPlatforms[rawStation.code] && trainPlatforms[rawStation.code][rawTrainNum]
         ? trainPlatforms[rawStation.code][rawTrainNum]
-        : "",
+        : ""
   } as Station;
 };
 
@@ -302,16 +264,12 @@ const updateTrains = async () => {
 
   const amtrakAlertsData = await fetch(
     "https://store.transitstat.us/amtrak_alerts" +
-      (process.env.SUPER_SECRET_CACHE_BUSTING
-        ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}`
-        : ""),
+      (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : "")
   ).then((res) => res.json());
 
   const brightlineRes = await fetch(
     "https://store.transitstat.us/brightline" +
-      (process.env.SUPER_SECRET_CACHE_BUSTING
-        ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}`
-        : ""),
+      (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : "")
   );
   const rawBrightline: any = await brightlineRes.json();
   brightlineData = rawBrightline["v1"];
@@ -322,19 +280,12 @@ const updateTrains = async () => {
 
   const allProxiedData: any = await fetch(
     "https://store.transitstat.us/amtrak_fetch_proxy" +
-      (process.env.SUPER_SECRET_CACHE_BUSTING
-        ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}`
-        : ""),
+      (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : "")
   ).then((res) => res.json());
   const viaData = allProxiedData.trainDataVIA;
   const stationData =
-    allProxiedData.trainStations.features.length > 0
-      ? allProxiedData.trainStations.features
-      : rawStations.features;
-  const amtrakData = mergeAmtrakFeeds(
-    allProxiedData.trainDataMain,
-    allProxiedData.trainDataASMAD,
-  ).features;
+    allProxiedData.trainStations.features.length > 0 ? allProxiedData.trainStations.features : rawStations.features;
+  const amtrakData = mergeAmtrakFeeds(allProxiedData.trainDataMain, allProxiedData.trainDataASMAD).features;
   AllTTMTrains = JSON.stringify(allProxiedData.trainDataASMAD);
   lastUpdatedTime = allProxiedData.updatedTime;
   decryptedTrainData = JSON.stringify(amtrakData);
@@ -342,9 +293,7 @@ const updateTrains = async () => {
 
   console.log("fetched s");
   stationData.forEach((station: any) => {
-    const actualCode =
-      amtrakStationCodeReplacements[station.properties.Code] ??
-      station.properties.Code;
+    const actualCode = amtrakStationCodeReplacements[station.properties.Code] ?? station.properties.Code;
 
     const stationObj = {
       name: stationMetaData.stationNames[station.properties.Code],
@@ -358,7 +307,7 @@ const updateTrains = async () => {
       city: station.properties.City,
       state: station.properties.State,
       zip: station.properties.Zipcode.toString(),
-      trains: [],
+      trains: []
     };
 
     if (!allStations[actualCode]) allStations[actualCode] = stationObj;
@@ -515,18 +464,12 @@ const updateTrains = async () => {
   Object.keys(brightlineData["trains"]).forEach((trainNum) => {
     const rawTrainData = brightlineData["trains"][trainNum];
 
-    if (
-      !rawTrainData.realTime &&
-      nowCleaning < rawTrainData.predictions[0].dep - 1000 * 60 * 60
-    )
-      return; // train is scheduled and should not be shown on Amtraker unless within 1 hour of dep
+    if (!rawTrainData.realTime && nowCleaning < rawTrainData.predictions[0].dep - 1000 * 60 * 60) return; // train is scheduled and should not be shown on Amtraker unless within 1 hour of dep
 
     const firstStation = rawTrainData["predictions"][0];
     const lastStation = rawTrainData["predictions"].slice(-1)[0];
     const trainEventStation =
-      rawTrainData["predictions"].filter(
-        (station) => station.dep >= Date.now(),
-      )[0] ?? lastStation;
+      rawTrainData["predictions"].filter((station) => station.dep >= Date.now())[0] ?? lastStation;
 
     let train: Train = {
       routeName: "Brightline",
@@ -536,13 +479,11 @@ const updateTrains = async () => {
       lat:
         rawTrainData.lat != 0
           ? rawTrainData.lat
-          : brightlineData["stations"][rawTrainData.predictions[0].stationID]
-              .lat,
+          : brightlineData["stations"][rawTrainData.predictions[0].stationID].lat,
       lon:
         rawTrainData.lon != 0
           ? rawTrainData.lon
-          : brightlineData["stations"][rawTrainData.predictions[0].stationID]
-              .lon,
+          : brightlineData["stations"][rawTrainData.predictions[0].stationID].lon,
       trainTimely: "",
       iconColor: "#212529",
       textColor: "#ffffff",
@@ -561,25 +502,19 @@ const updateTrains = async () => {
             city: "",
             state: "",
             zip: "",
-            trains: [],
+            trains: []
           };
         }
 
-        allStations[actualID].trains.push(
-          "b" + trainNum + "-" + new Date(firstStation.dep).getDate(),
-        );
+        allStations[actualID].trains.push("b" + trainNum + "-" + new Date(firstStation.dep).getDate());
 
         return {
           name: prediction["stationName"],
           code: actualID,
           tz: prediction["tz"],
           bus: false,
-          schArr: new Date(
-            prediction["arr"] - prediction["arrDelay"],
-          ).toISOString(),
-          schDep: new Date(
-            prediction["dep"] - prediction["depDelay"],
-          ).toISOString(),
+          schArr: new Date(prediction["arr"] - prediction["arrDelay"]).toISOString(),
+          schDep: new Date(prediction["dep"] - prediction["depDelay"]).toISOString(),
           arr: new Date(prediction["arr"]).toISOString(),
           dep: new Date(prediction["dep"]).toISOString(),
           arrCmnt: "",
@@ -587,10 +522,9 @@ const updateTrains = async () => {
           status: prediction["dep"] > Date.valueOf() ? "Departed" : "Enroute",
           stopIconColor: "#212529",
           platform:
-            brightlinePlatforms[prediction.stationID] &&
-            brightlinePlatforms[prediction.stationID][trainNum]
+            brightlinePlatforms[prediction.stationID] && brightlinePlatforms[prediction.stationID][trainNum]
               ? brightlinePlatforms[prediction.stationID][trainNum]
-              : "",
+              : ""
         };
       }),
       heading: ccDegToCardinal(rawTrainData.heading),
@@ -613,27 +547,21 @@ const updateTrains = async () => {
       provider: "Brightline",
       providerShort: "BLNE",
       onlyOfTrainNum: true,
-      alerts: [],
+      alerts: []
     };
 
     const calculatedColors = calculateIconColor(train, allStations);
     train.iconColor = calculatedColors["color"];
     train.textColor = calculatedColors["text"];
     train.stations = train.stations.map((stationRaw) => {
-      return {
-        ...stationRaw,
-        stopIconColor: calculateIconColor(train, allStations, stationRaw.code)[
-          "color"
-        ],
-      };
+      return { ...stationRaw, stopIconColor: calculateIconColor(train, allStations, stationRaw.code)["color"] };
     });
 
     if (!trains["b" + trainNum]) trains["b" + trainNum] = [];
     trains["b" + trainNum].push(train);
 
     if (train.trainState === "Active") {
-      staleData.avgLastUpdate +=
-        nowCleaning - new Date(train.lastValTS).valueOf();
+      staleData.avgLastUpdate += nowCleaning - new Date(train.lastValTS).valueOf();
       staleData.activeTrains++;
 
       //console.log(train.trainNum, train.lastValTS, nowCleaning - new Date(train.lastValTS).valueOf(), nowCleaning - new Date(train.lastValTS).valueOf() > (1000 * 60 * 15))
@@ -646,46 +574,32 @@ const updateTrains = async () => {
     if (!rawTrainData.departed) return; //train doesn't exist
     if (actualTrainNum == "v97" || actualTrainNum == "v98") {
       //covered by amtrak, but we need to add some stops
-      const replacements = {
-        v97: "64",
-        v98: "63",
-      };
-      additionalVIAStops[replacements[actualTrainNum]] =
-        rawTrainData.times.sort(
-          (a, b) =>
-            new Date(a.scheduled).valueOf() - new Date(b.scheduled).valueOf(),
-        );
-      additionalVIAAlerts[replacements[actualTrainNum]] =
-        rawTrainData.alerts ?? [];
+      const replacements = { v97: "64", v98: "63" };
+      additionalVIAStops[replacements[actualTrainNum]] = rawTrainData.times.sort(
+        (a, b) => new Date(a.scheduled).valueOf() - new Date(b.scheduled).valueOf()
+      );
+      additionalVIAAlerts[replacements[actualTrainNum]] = rawTrainData.alerts ?? [];
 
       return;
     }
 
     const sortedStations = rawTrainData.times.sort(
-      (a, b) =>
-        new Date(a.scheduled).valueOf() - new Date(b.scheduled).valueOf(),
+      (a, b) => new Date(a.scheduled).valueOf() - new Date(b.scheduled).valueOf()
     );
 
     const firstStation = sortedStations[0];
     const lastStation = sortedStations[sortedStations.length - 1];
-    const trainEventStation =
-      sortedStations.find((station) => station.eta !== "ARR") ?? firstStation;
+    const trainEventStation = sortedStations.find((station) => station.eta !== "ARR") ?? firstStation;
 
     let trainDelay = 0;
 
     let train: Train = {
-      routeName:
-        viaTrainNames[trainNum.split(" ")[0]] ??
-        `${title(rawTrainData.from)}-${title(rawTrainData.to)}`,
+      routeName: viaTrainNames[trainNum.split(" ")[0]] ?? `${title(rawTrainData.from)}-${title(rawTrainData.to)}`,
       trainNum: `${actualTrainNum}`,
       trainNumRaw: trainNum.split(" ")[0],
       trainID: `${actualTrainNum}-${Number(rawTrainData.instance.split("-")[2])}`,
-      lat:
-        rawTrainData.lat ??
-        stationMetaData.viaCoords[trainEventStation.code][0],
-      lon:
-        rawTrainData.lng ??
-        stationMetaData.viaCoords[trainEventStation.code][1],
+      lat: rawTrainData.lat ?? stationMetaData.viaCoords[trainEventStation.code][0],
+      lon: rawTrainData.lng ?? stationMetaData.viaCoords[trainEventStation.code][1],
       trainTimely: "",
       iconColor: "#212529",
       textColor: "#ffffff",
@@ -695,19 +609,15 @@ const updateTrains = async () => {
             name: stationMetaData.viaStationNames[station.code],
             code: station.code,
             tz: stationMetaData.viatimeZones[station.code] ?? "America/Toronto",
-            lat: stationMetaData.viaCoords[station.code]
-              ? stationMetaData.viaCoords[station.code][0]
-              : 0,
-            lon: stationMetaData.viaCoords[station.code]
-              ? stationMetaData.viaCoords[station.code][1]
-              : 0,
+            lat: stationMetaData.viaCoords[station.code] ? stationMetaData.viaCoords[station.code][0] : 0,
+            lon: stationMetaData.viaCoords[station.code] ? stationMetaData.viaCoords[station.code][1] : 0,
             hasAddress: false,
             address1: "",
             address2: "",
             city: "",
             state: "",
             zip: "",
-            trains: [],
+            trains: []
           };
 
           if (station.code == "MIMC") {
@@ -724,19 +634,15 @@ const updateTrains = async () => {
               city: "Etobicoke",
               state: "ON",
               zip: "M8V 3B6",
-              trains: [],
+              trains: []
             };
           }
         }
 
-        allStations[station.code].trains.push(
-          `${actualTrainNum}-${Number(rawTrainData.instance.split("-")[2])}`,
-        );
+        allStations[station.code].trains.push(`${actualTrainNum}-${Number(rawTrainData.instance.split("-")[2])}`);
 
         if (station.arrival && station.arrival.estimated) {
-          trainDelay =
-            new Date(station.arrival.estimated).valueOf() -
-            new Date(station.arrival.scheduled).valueOf();
+          trainDelay = new Date(station.arrival.estimated).valueOf() - new Date(station.arrival.scheduled).valueOf();
         }
 
         const estArr = (station.arrival ?? station.departure).estimated;
@@ -749,25 +655,13 @@ const updateTrains = async () => {
           bus: false,
           schArr: (station.arrival ?? station.departure).scheduled,
           schDep: (station.departure ?? station.arrival).scheduled,
-          arr:
-            estArr ??
-            new Date(
-              new Date(
-                (station.arrival ?? station.departure).scheduled,
-              ).valueOf() + trainDelay,
-            ),
-          dep:
-            estDep ??
-            new Date(
-              new Date(
-                (station.departure ?? station.arrival).scheduled,
-              ).valueOf() + trainDelay,
-            ),
+          arr: estArr ?? new Date(new Date((station.arrival ?? station.departure).scheduled).valueOf() + trainDelay),
+          dep: estDep ?? new Date(new Date((station.departure ?? station.arrival).scheduled).valueOf() + trainDelay),
           arrCmnt: "",
           depCmnt: "",
           status: station.eta === "ARR" ? "Departed" : "Enroute",
           stopIconColor: "#212529",
-          platform: "",
+          platform: ""
         };
       }),
       heading: ccDegToCardinal(rawTrainData.direction),
@@ -791,30 +685,22 @@ const updateTrains = async () => {
       providerShort: "VIA",
       onlyOfTrainNum: true,
       alerts: (rawTrainData.alerts ?? []).map((alert) => {
-        return {
-          message: alert.description.en.replaceAll("\n", " "),
-        };
-      }),
+        return { message: alert.description.en.replaceAll("\n", " ") };
+      })
     };
 
     const calculatedColors = calculateIconColor(train, allStations);
     train.iconColor = calculatedColors["color"];
     train.textColor = calculatedColors["text"];
     train.stations = train.stations.map((stationRaw) => {
-      return {
-        ...stationRaw,
-        stopIconColor: calculateIconColor(train, allStations, stationRaw.code)[
-          "color"
-        ],
-      };
+      return { ...stationRaw, stopIconColor: calculateIconColor(train, allStations, stationRaw.code)["color"] };
     });
 
     if (!trains[actualTrainNum]) trains[actualTrainNum] = [];
     trains[actualTrainNum].push(train);
 
     if (train.trainState === "Active") {
-      staleData.avgLastUpdate +=
-        nowCleaning - new Date(train.lastValTS).valueOf();
+      staleData.avgLastUpdate += nowCleaning - new Date(train.lastValTS).valueOf();
       staleData.activeTrains++;
 
       //console.log(train.trainNum, train.lastValTS, nowCleaning - new Date(train.lastValTS).valueOf(), nowCleaning - new Date(train.lastValTS).valueOf() > (1000 * 60 * 15))
@@ -845,8 +731,7 @@ const updateTrains = async () => {
     }
 
     let stations = rawStations.map((station) => {
-      const actualCode =
-        amtrakStationCodeReplacements[station.code] ?? station.code;
+      const actualCode = amtrakStationCodeReplacements[station.code] ?? station.code;
 
       if (!allStations[actualCode]) {
         if (!amtrakerCache.stationExists(actualCode)) {
@@ -862,16 +747,12 @@ const updateTrains = async () => {
             city: "",
             state: "",
             zip: "",
-            trains: [],
+            trains: []
           });
         }
       }
 
-      const result = parseRawStation(
-        station,
-        rawTrainData,
-        rawTrainData.trainnum,
-      ); //, rawTrainData.trainnum == "784");
+      const result = parseRawStation(station, rawTrainData, rawTrainData.trainnum); //, rawTrainData.trainnum == "784");
 
       return result;
     });
@@ -882,34 +763,23 @@ const updateTrains = async () => {
     }
 
     const enrouteStations = stations.filter(
-      (station) =>
-        (station.status === "Enroute" || station.status === "Station") &&
-        (station.arr || station.dep),
+      (station) => (station.status === "Enroute" || station.status === "Station") && (station.arr || station.dep)
     );
 
-    const trainEventCode =
-      enrouteStations.length == 0
-        ? stations[stations.length - 1].code
-        : enrouteStations[0].code;
-    const actualTrainEventCode =
-      amtrakStationCodeReplacements[trainEventCode] ?? trainEventCode;
-    const actualOrigCode =
-      amtrakStationCodeReplacements[rawTrainData.origcode] ??
-      rawTrainData.origcode;
-    const actualDestCode =
-      amtrakStationCodeReplacements[rawTrainData.destcode] ??
-      rawTrainData.destcode;
+    const trainEventCode = enrouteStations.length == 0 ? stations[stations.length - 1].code : enrouteStations[0].code;
+    const actualTrainEventCode = amtrakStationCodeReplacements[trainEventCode] ?? trainEventCode;
+    const actualOrigCode = amtrakStationCodeReplacements[rawTrainData.origcode] ?? rawTrainData.origcode;
+    const actualDestCode = amtrakStationCodeReplacements[rawTrainData.destcode] ?? rawTrainData.destcode;
 
     // i hate this more than you do
     const originDateOfMonth = new Intl.DateTimeFormat("en-US", {
       timeZone: stationMetaData.timeZones[rawTrainData.origcode],
-      day: "numeric",
+      day: "numeric"
     }).format(new Date(stations[0].schDep));
 
     // adding in VIA stops, if they exist
 
-    const additionalStations: Array<any> =
-      additionalVIAStops[`${+rawTrainData.trainnum}`] ?? [];
+    const additionalStations: Array<any> = additionalVIAStops[`${+rawTrainData.trainnum}`] ?? [];
     let viaTrainDelay = 0;
 
     const processedVIAStops = additionalStations.map((station) => {
@@ -918,30 +788,22 @@ const updateTrains = async () => {
           name: stationMetaData.viaStationNames[station.code],
           code: station.code,
           tz: stationMetaData.viatimeZones[station.code] ?? "America/Toronto",
-          lat: stationMetaData.viaCoords[station.code]
-            ? stationMetaData.viaCoords[station.code][0]
-            : 0,
-          lon: stationMetaData.viaCoords[station.code]
-            ? stationMetaData.viaCoords[station.code][1]
-            : 0,
+          lat: stationMetaData.viaCoords[station.code] ? stationMetaData.viaCoords[station.code][0] : 0,
+          lon: stationMetaData.viaCoords[station.code] ? stationMetaData.viaCoords[station.code][1] : 0,
           hasAddress: false,
           address1: "",
           address2: "",
           city: "",
           state: "",
           zip: "",
-          trains: [],
+          trains: []
         };
       }
 
-      allStations[station.code].trains.push(
-        `${+rawTrainData.trainnum}-${originDateOfMonth}`,
-      );
+      allStations[station.code].trains.push(`${+rawTrainData.trainnum}-${originDateOfMonth}`);
 
       if (station.arrival && station.arrival.estimated) {
-        viaTrainDelay =
-          new Date(station.arrival.estimated).valueOf() -
-          new Date(station.arrival.scheduled).valueOf();
+        viaTrainDelay = new Date(station.arrival.estimated).valueOf() - new Date(station.arrival.scheduled).valueOf();
       }
 
       const estArr = (station.arrival ?? station.departure).estimated;
@@ -954,32 +816,18 @@ const updateTrains = async () => {
         bus: false,
         schArr: (station.arrival ?? station.departure).scheduled,
         schDep: (station.departure ?? station.arrival).scheduled,
-        arr:
-          estArr ??
-          new Date(
-            new Date(
-              (station.arrival ?? station.departure).scheduled,
-            ).valueOf() + viaTrainDelay,
-          ),
-        dep:
-          estDep ??
-          new Date(
-            new Date(
-              (station.departure ?? station.arrival).scheduled,
-            ).valueOf() + viaTrainDelay,
-          ),
+        arr: estArr ?? new Date(new Date((station.arrival ?? station.departure).scheduled).valueOf() + viaTrainDelay),
+        dep: estDep ?? new Date(new Date((station.departure ?? station.arrival).scheduled).valueOf() + viaTrainDelay),
         arrCmnt: "",
         depCmnt: "",
         status: station.eta === "ARR" ? "Departed" : "Enroute",
         stopIconColor: "#212529",
-        platform: "",
+        platform: ""
       };
     });
 
     if (processedVIAStops.length > 0) {
-      const indexOfVIAStart = stations.findIndex(
-        (station) => station.code == processedVIAStops[0].code,
-      );
+      const indexOfVIAStart = stations.findIndex((station) => station.code == processedVIAStops[0].code);
 
       // removing the first and last stop so we have no dupes
       processedVIAStops.shift();
@@ -992,9 +840,7 @@ const updateTrains = async () => {
     // end of adding via stops
 
     let train: Train = {
-      routeName: trainNames[+rawTrainData.trainnum]
-        ? trainNames[+rawTrainData.trainnum]
-        : rawTrainData.routename,
+      routeName: trainNames[+rawTrainData.trainnum] ? trainNames[+rawTrainData.trainnum] : rawTrainData.routename,
       trainNum: `${+rawTrainData.trainnum}`,
       trainNumRaw: `${+rawTrainData.trainnum}`,
       trainID: `${+rawTrainData.trainnum}-${originDateOfMonth}`,
@@ -1017,10 +863,7 @@ const updateTrains = async () => {
       trainState: rawTrainData.trainstate,
       velocity: +rawTrainData.velocity,
       statusMsg:
-        stations.filter(
-          (station) =>
-            !station.arr && !station.dep && station.code === trainEventCode,
-        ).length > 0
+        stations.filter((station) => !station.arr && !station.dep && station.code === trainEventCode).length > 0
           ? "SERVICE DISRUPTION"
           : rawTrainData.statusmsg,
       createdAt:
@@ -1029,16 +872,12 @@ const updateTrains = async () => {
       updatedAt:
         parseDate(rawTrainData.updated_at, "America/New_York") ??
         parseDate(rawTrainData.created_at, "America/New_York"),
-      lastValTS:
-        parseDate(rawTrainData.lastvalts, trainEventCode) ?? stations[0].schDep,
+      lastValTS: parseDate(rawTrainData.lastvalts, trainEventCode) ?? stations[0].schDep,
       objectID: rawTrainData.OBJECTID,
       provider: "Amtrak",
       providerShort: "AMTK",
       onlyOfTrainNum: true,
-      alerts:
-        amtrakAlertsData["trains"][
-          `${+rawTrainData.trainnum}-${originDateOfMonth}`
-        ] ?? [],
+      alerts: amtrakAlertsData["trains"][`${+rawTrainData.trainnum}-${originDateOfMonth}`] ?? []
     };
     //console.log(train.trainID, train.trainNum, train.trainState)
 
@@ -1046,18 +885,11 @@ const updateTrains = async () => {
     train.iconColor = calculatedColors["color"];
     train.textColor = calculatedColors["text"];
     train.stations = train.stations.map((stationRaw) => {
-      return {
-        ...stationRaw,
-        stopIconColor: calculateIconColor(train, allStations, stationRaw.code)[
-          "color"
-        ],
-      };
+      return { ...stationRaw, stopIconColor: calculateIconColor(train, allStations, stationRaw.code)["color"] };
     });
 
     if (train.trainState === "Predeparture" && true) {
-      const initialDeparture = new Date(
-        train.stations[0].dep ?? train.stations[0].arr,
-      );
+      const initialDeparture = new Date(train.stations[0].dep ?? train.stations[0].arr);
 
       // dont include train if more than an hour until departure
       if (initialDeparture.valueOf() > nowCleaning + 1000 * 60 * 60) return;
@@ -1067,8 +899,7 @@ const updateTrains = async () => {
     trains[rawTrainData.trainnum].push(train);
 
     if (train.trainState === "Active") {
-      staleData.avgLastUpdate +=
-        nowCleaning - new Date(train.lastValTS).valueOf();
+      staleData.avgLastUpdate += nowCleaning - new Date(train.lastValTS).valueOf();
       staleData.activeTrains++;
 
       //console.log(train.trainID, train.lastValTS, nowCleaning - new Date(train.lastValTS).valueOf(), nowCleaning - new Date(train.lastValTS).valueOf() > (1000 * 60 * 15))
@@ -1112,13 +943,33 @@ updateTrains();
 
 setInterval(() => updateTrains(), 1000 * 15); // every 15 seconds
 
-Bun.serve({
+const cleanUpIPs = () => {
+  Object.keys(topIPs)
+    .sort((a, b) => topIPs[b] - topIPs[a])
+    .slice(25)
+    .forEach((ip) => {
+      delete topIPs[ip];
+    });
+};
+
+setInterval(() => cleanUpIPs(), 300 * 1000);
+
+const server = Bun.serve({
   port: process.env.PORT ?? 3001,
   fetch(request) {
+    const ipAddr = server.requestIP(request).address ?? request.headers["CF-Connecting-IP"];
+
+    if (!topIPs[ipAddr]) topIPs[ipAddr] = 0;
+    topIPs[ipAddr]++;
+
     let url = new URL(request.url).pathname;
 
     if (url.startsWith("/v2")) {
       url = url.replace("/v2", "/v3");
+    }
+
+    if (url === `/v3/ips` && request.url.endsWith(process.env.SUPER_SECRET_ACCESS_KEY)) {
+      return new Response(JSON.stringify({ topIPs }), { headers: { "content-type": "application/json" } });
     }
 
     if (url === "/v3/all") {
@@ -1126,35 +977,26 @@ Bun.serve({
       const stations = amtrakerCache.getStations();
       const ids = amtrakerCache.getIDs();
 
-      return new Response(
-        JSON.stringify({
-          trains,
-          stations,
-          ids,
-          shitsFucked,
-          staleData: servedStaleData,
-        }),
-        {
-          headers: {
-            "Access-Control-Allow-Origin": "*", // CORS
-            "content-type": "application/json",
-          },
-        },
-      );
+      return new Response(JSON.stringify({ trains, stations, ids, shitsFucked, staleData: servedStaleData }), {
+        headers: {
+          "Access-Control-Allow-Origin": "*", // CORS
+          "content-type": "application/json"
+        }
+      });
     }
 
     if (url === "/v3/times") {
       return new Response(JSON.stringify(lastUpdatedTime), {
         headers: {
           "Access-Control-Allow-Origin": "*", // CORS
-          "content-type": "application/json",
-        },
+          "content-type": "application/json"
+        }
       });
     }
 
     if (url === "/") {
       return new Response(
-        "Welcome to the Amtreker API! Docs should be available at /docs, if I remembered to add them...",
+        "Welcome to the Amtreker API! Docs should be available at /docs, if I remembered to add them..."
       );
     }
 
@@ -1170,8 +1012,8 @@ Bun.serve({
       return new Response(shitsFucked.toString(), {
         headers: {
           "Access-Control-Allow-Origin": "*", // CORS
-          "content-type": "application/json",
-        },
+          "content-type": "application/json"
+        }
       });
     }
 
@@ -1179,8 +1021,8 @@ Bun.serve({
       return new Response(decryptedTrainData, {
         headers: {
           "Access-Control-Allow-Origin": "*", // CORS
-          "content-type": "application/json",
-        },
+          "content-type": "application/json"
+        }
       });
     }
 
@@ -1188,8 +1030,8 @@ Bun.serve({
       return new Response(decryptedStationData, {
         headers: {
           "Access-Control-Allow-Origin": "*", // CORS
-          "content-type": "application/json",
-        },
+          "content-type": "application/json"
+        }
       });
     }
 
@@ -1197,8 +1039,8 @@ Bun.serve({
       return new Response(AllTTMTrains, {
         headers: {
           "Access-Control-Allow-Origin": "*", // CORS
-          "content-type": "application/json",
-        },
+          "content-type": "application/json"
+        }
       });
     }
 
@@ -1206,8 +1048,8 @@ Bun.serve({
       return new Response(JSON.stringify(servedStaleData), {
         headers: {
           "Access-Control-Allow-Origin": "*", // CORS
-          "content-type": "application/json",
-        },
+          "content-type": "application/json"
+        }
       });
     }
 
@@ -1217,8 +1059,8 @@ Bun.serve({
       return new Response(JSON.stringify(trainIDs), {
         headers: {
           "Access-Control-Allow-Origin": "*", // CORS
-          "content-type": "application/json",
-        },
+          "content-type": "application/json"
+        }
       });
     }
 
@@ -1232,24 +1074,19 @@ Bun.serve({
         return new Response(JSON.stringify(trains), {
           headers: {
             "Access-Control-Allow-Origin": "*", // CORS
-            "content-type": "application/json",
-          },
+            "content-type": "application/json"
+          }
         });
       }
 
       if (trainNum === "arr") {
         console.log(request.url, url, "all trains in an array");
-        return new Response(
-          JSON.stringify({
-            0: Object.values(trains).flatMap((n) => n),
-          }),
-          {
-            headers: {
-              "Access-Control-Allow-Origin": "*", // CORS
-              "content-type": "application/json",
-            },
-          },
-        );
+        return new Response(JSON.stringify({ 0: Object.values(trains).flatMap((n) => n) }), {
+          headers: {
+            "Access-Control-Allow-Origin": "*", // CORS
+            "content-type": "application/json"
+          }
+        });
       }
 
       console.log(request.url, url, "train num", trainNum);
@@ -1261,30 +1098,27 @@ Bun.serve({
           return new Response(JSON.stringify([]), {
             headers: {
               "Access-Control-Allow-Origin": "*", // CORS
-              "content-type": "application/json",
-            },
+              "content-type": "application/json"
+            }
           });
         }
 
         for (let i = 0; i < trainsArr.length; i++) {
           if (trainsArr[i].trainID === trainNum) {
-            return new Response(
-              JSON.stringify({ [trainNum.split("-")[0]]: [trainsArr[i]] }),
-              {
-                headers: {
-                  "Access-Control-Allow-Origin": "*", // CORS
-                  "content-type": "application/json",
-                },
-              },
-            );
+            return new Response(JSON.stringify({ [trainNum.split("-")[0]]: [trainsArr[i]] }), {
+              headers: {
+                "Access-Control-Allow-Origin": "*", // CORS
+                "content-type": "application/json"
+              }
+            });
           }
         }
 
         return new Response(JSON.stringify([]), {
           headers: {
             "Access-Control-Allow-Origin": "*", // CORS
-            "content-type": "application/json",
-          },
+            "content-type": "application/json"
+          }
         });
       }
 
@@ -1292,22 +1126,17 @@ Bun.serve({
         return new Response(JSON.stringify([]), {
           headers: {
             "Access-Control-Allow-Origin": "*", // CORS
-            "content-type": "application/json",
-          },
+            "content-type": "application/json"
+          }
         });
       }
 
-      return new Response(
-        JSON.stringify({
-          [trainNum]: trains[trainNum],
-        }),
-        {
-          headers: {
-            "Access-Control-Allow-Origin": "*", // CORS
-            "content-type": "application/json",
-          },
-        },
-      );
+      return new Response(JSON.stringify({ [trainNum]: trains[trainNum] }), {
+        headers: {
+          "Access-Control-Allow-Origin": "*", // CORS
+          "content-type": "application/json"
+        }
+      });
     }
 
     if (url.startsWith("/v3/stations/expanded")) {
@@ -1319,8 +1148,8 @@ Bun.serve({
         return new Response(JSON.stringify([]), {
           headers: {
             "Access-Control-Allow-Origin": "*", // CORS
-            "content-type": "application/json",
-          },
+            "content-type": "application/json"
+          }
         });
       }
 
@@ -1330,9 +1159,7 @@ Bun.serve({
           const trainsArr = trains[trainID.split("-")[0]];
           const train = trainsArr.find((train) => train.trainID == trainID);
 
-          const thisStationFull = train?.stations.find(
-            (station) => station.code == stationCode,
-          );
+          const thisStationFull = train?.stations.find((station) => station.code == stationCode);
           const thisStationMin = {
             schArr: thisStationFull?.schArr,
             schDep: thisStationFull?.schDep,
@@ -1340,7 +1167,7 @@ Bun.serve({
             dep: thisStationFull?.dep,
             status: thisStationFull?.status,
             stopIconColor: thisStationFull?.stopIconColor,
-            platform: thisStationFull?.platform,
+            platform: thisStationFull?.platform
           };
 
           return {
@@ -1372,22 +1199,17 @@ Bun.serve({
             provider: train?.provider,
             providerShort: train?.providerShort,
             onlyOfTrainNum: train?.onlyOfTrainNum,
-            alerts: train?.alerts,
+            alerts: train?.alerts
           };
-        }),
+        })
       };
 
-      return new Response(
-        JSON.stringify({
-          [stationCode]: newStation,
-        }),
-        {
-          headers: {
-            "Access-Control-Allow-Origin": "*", // CORS
-            "content-type": "application/json",
-          },
-        },
-      );
+      return new Response(JSON.stringify({ [stationCode]: newStation }), {
+        headers: {
+          "Access-Control-Allow-Origin": "*", // CORS
+          "content-type": "application/json"
+        }
+      });
     }
 
     if (url.startsWith("/v3/stations")) {
@@ -1399,8 +1221,8 @@ Bun.serve({
         return new Response(JSON.stringify(stations), {
           headers: {
             "Access-Control-Allow-Origin": "*", // CORS
-            "content-type": "application/json",
-          },
+            "content-type": "application/json"
+          }
         });
       }
 
@@ -1408,22 +1230,17 @@ Bun.serve({
         return new Response(JSON.stringify([]), {
           headers: {
             "Access-Control-Allow-Origin": "*", // CORS
-            "content-type": "application/json",
-          },
+            "content-type": "application/json"
+          }
         });
       }
 
-      return new Response(
-        JSON.stringify({
-          [stationCode]: stations[stationCode],
-        }),
-        {
-          headers: {
-            "Access-Control-Allow-Origin": "*", // CORS
-            "content-type": "application/json",
-          },
-        },
-      );
+      return new Response(JSON.stringify({ [stationCode]: stations[stationCode] }), {
+        headers: {
+          "Access-Control-Allow-Origin": "*", // CORS
+          "content-type": "application/json"
+        }
+      });
     }
 
     if (url.startsWith("/v3/oembed")) {
@@ -1435,17 +1252,10 @@ Bun.serve({
       }
 
       const requestedURL = new URL(paramsObj.url);
-      const processedURL =
-        requestedURL.origin + requestedURL.pathname + "?oembed";
+      const processedURL = requestedURL.origin + requestedURL.pathname + "?oembed";
 
-      const embedWidth = Math.min(
-        paramsObj.maxwidth ? Number(paramsObj.maxwidth) : 1000,
-        464,
-      );
-      const embedHeight = Math.min(
-        paramsObj.maxheight ? Number(paramsObj.maxheight) : 1000,
-        788,
-      );
+      const embedWidth = Math.min(paramsObj.maxwidth ? Number(paramsObj.maxwidth) : 1000, 464);
+      const embedHeight = Math.min(paramsObj.maxheight ? Number(paramsObj.maxheight) : 1000, 788);
 
       const oembedResponse = {
         type: "rich",
@@ -1456,33 +1266,28 @@ Bun.serve({
         cache_age: "180",
         html: `<iframe src="${processedURL}" style="border:0px #ffffff none;" name="amtraker_iframe" scrolling="no" frameborder="0" marginheight="0px" marginwidth="0px" height="${embedHeight}px" width="${embedWidth}px" allowfullscreen></iframe>`,
         width: embedWidth,
-        height: embedHeight,
+        height: embedHeight
       };
 
       if (paramsObj.format && paramsObj.format === "xml") {
         const xmlResponse = xmlBuilder.build(oembedResponse);
 
-        return new Response(
-          `<?xml version="1.0" encoding="utf-8"?><oembed>${xmlResponse}</oembed>`,
-          {
-            headers: {
-              "Access-Control-Allow-Origin": "*", // CORS
-              "content-type": "text/xml+oembed",
-            },
-          },
-        );
+        return new Response(`<?xml version="1.0" encoding="utf-8"?><oembed>${xmlResponse}</oembed>`, {
+          headers: {
+            "Access-Control-Allow-Origin": "*", // CORS
+            "content-type": "text/xml"
+          }
+        });
       }
 
       return new Response(JSON.stringify(oembedResponse, null, 2), {
         headers: {
           "Access-Control-Allow-Origin": "*", // CORS
-          "content-type": "application/json+oembed",
-        },
+          "content-type": "application/json"
+        }
       });
     }
 
-    return new Response("Not found", {
-      status: 404,
-    });
-  },
+    return new Response("Not found", { status: 404 });
+  }
 });
