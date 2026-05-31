@@ -847,8 +847,8 @@ const updateTrains = async () => {
       trainNum: `${+rawTrainData.trainnum}`,
       trainNumRaw: `${+rawTrainData.trainnum}`,
       trainID: `${+rawTrainData.trainnum}-${originDateOfMonth}`,
-      lat: property.geometry.coordinates[1],
-      lon: property.geometry.coordinates[0],
+      lat: parseFloat(property.geometry.coordinates[1].toFixed(6)),
+      lon: parseFloat(property.geometry.coordinates[0].toFixed(6)),
       trainTimely: "",
       iconColor: "#212529",
       textColor: "#ffffff",
@@ -868,7 +868,7 @@ const updateTrains = async () => {
       statusMsg:
         stations.filter((station) => !station.arr && !station.dep && station.code === trainEventCode).length > 0
           ? "SERVICE DISRUPTION"
-          : "NO DATA",
+          : rawTrainData.statusmsg,
       createdAt:
         parseDate(rawTrainData.created_at, "America/New_York") ??
         parseDate(rawTrainData.updated_at, "America/New_York"),
