@@ -955,9 +955,9 @@ const cleanUpIPs = () => {
     });
 };
 
-setInterval(() => cleanUpIPs(), 300 * 1000);
+//setInterval(() => cleanUpIPs(), 300 * 1000);
 
-const blocks = ["2600:1f10:40b2:b00:ebe6:6636:a8da:f1af"];
+const blocks = [];
 
 const server = Bun.serve({
   port: process.env.PORT ?? 3001,
@@ -979,8 +979,10 @@ const server = Bun.serve({
       */
     }
 
+    /*
     if (!topIPs[ipAddr]) topIPs[ipAddr] = { count: 0, headers: Object.fromEntries(request.headers) };
     topIPs[ipAddr].count++;
+    */
 
     let url = new URL(request.url).pathname;
 
@@ -993,12 +995,10 @@ const server = Bun.serve({
 
       //console.log(ipAddr, request.headers.get("x-real-ip"), request.headers)
 
-      /*
       return new Response(
         JSON.stringify([]),
         { headers: { "content-type": "application/json" } }
       );
-      */
 
       return new Response(
         JSON.stringify(
