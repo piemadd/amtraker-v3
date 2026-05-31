@@ -847,8 +847,8 @@ const updateTrains = async () => {
       trainNum: `${+rawTrainData.trainnum}`,
       trainNumRaw: `${+rawTrainData.trainnum}`,
       trainID: `${+rawTrainData.trainnum}-${originDateOfMonth}`,
-      lat: parseFloat(property.geometry.coordinates[1].toFixed(6)),
-      lon: parseFloat(property.geometry.coordinates[0].toFixed(6)),
+      lat: property.geometry.coordinates[1],
+      lon: property.geometry.coordinates[0],
       trainTimely: "",
       iconColor: "#212529",
       textColor: "#ffffff",
@@ -993,10 +993,12 @@ const server = Bun.serve({
 
       //console.log(ipAddr, request.headers.get("x-real-ip"), request.headers)
 
+      /*
       return new Response(
         JSON.stringify([]),
         { headers: { "content-type": "application/json" } }
       );
+      */
 
       return new Response(
         JSON.stringify(
@@ -1166,7 +1168,7 @@ const server = Bun.serve({
                   destName: "Chicago Union",
                   trainState: "Active",
                   velocity: 0,
-                  statusMsg: "Please provide proper attribution to Amtraker on your website and email me (amtraker@piemadd.com) to have this block removed.",
+                  statusMsg: " ",
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
                   lastValTS: new Date().toISOString(),
