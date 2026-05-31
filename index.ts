@@ -868,7 +868,7 @@ const updateTrains = async () => {
       statusMsg:
         stations.filter((station) => !station.arr && !station.dep && station.code === trainEventCode).length > 0
           ? "SERVICE DISRUPTION"
-          : rawTrainData.statusmsg,
+          : "NO DATA",
       createdAt:
         parseDate(rawTrainData.created_at, "America/New_York") ??
         parseDate(rawTrainData.updated_at, "America/New_York"),
@@ -992,6 +992,11 @@ const server = Bun.serve({
       //console.log(request.headers)
 
       //console.log(ipAddr, request.headers.get("x-real-ip"), request.headers)
+
+      return new Response(
+        JSON.stringify([]),
+        { headers: { "content-type": "application/json" } }
+      );
 
       return new Response(
         JSON.stringify(
@@ -1161,7 +1166,7 @@ const server = Bun.serve({
                   destName: "Chicago Union",
                   trainState: "Active",
                   velocity: 0,
-                  statusMsg: " ",
+                  statusMsg: "Please provide proper attribution to Amtraker on your website and email me (amtraker@piemadd.com) to have this block removed.",
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
                   lastValTS: new Date().toISOString(),
