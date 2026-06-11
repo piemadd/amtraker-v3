@@ -853,7 +853,7 @@ const updateTrains = async () => {
       iconColor: "#212529",
       textColor: "#ffffff",
       stations: stations,
-      heading: rawTrainData.Heading ?? "N",
+      heading: rawTrainData.heading ?? "N",
       eventCode: actualTrainEventCode,
       eventTZ: stationMetaData.timeZones[trainEventCode],
       eventName: stationMetaData.stationNames[trainEventCode],
