@@ -934,6 +934,46 @@ const updateTrains = async () => {
 
   servedStaleData = JSON.parse(JSON.stringify(staleData));
 
+  // refreshing VIA stations that have 0 trains
+  Object.keys(stationMetaData.viaStationNames).forEach((stationCode) => {
+    if (!allStations[stationCode]) {
+      allStations[stationCode] = {
+        name: stationMetaData.viaStationNames[stationCode],
+        code: stationCode,
+        tz: stationMetaData.viatimeZones[stationCode],
+        lat: stationMetaData.viaCoords[stationCode][0],
+        lon: stationMetaData.viaCoords[stationCode][1],
+        hasAddress: false,
+        address1: "",
+        address2: "",
+        city: "",
+        state: "",
+        zip: "",
+        trains: []
+      };
+    }
+  });
+
+  // doing the same with brightline
+  Object.keys(brightlineData["stations"]).forEach((stationCode) => {
+    if (!allStations[stationCode]) {
+      allStations[stationCode] = {
+        name: brightlineData["stations"][stationCode]["stationName"],
+        code: stationCode,
+        tz: brightlineData["stations"][stationCode]["tz"],
+        lat: brightlineData["stations"][stationCode]["lat"],
+        lon: brightlineData["stations"][stationCode]["lon"],
+        hasAddress: false,
+        address1: "",
+        address2: "",
+        city: "",
+        state: "",
+        zip: "",
+        trains: []
+      };
+    }
+  });
+
   Object.keys(allStations).forEach((stationKey) => {
     amtrakerCache.setStation(stationKey, allStations[stationKey]);
   });
@@ -995,10 +1035,7 @@ const server = Bun.serve({
 
       //console.log(ipAddr, request.headers.get("x-real-ip"), request.headers)
 
-      return new Response(
-        JSON.stringify([]),
-        { headers: { "content-type": "application/json" } }
-      );
+      return new Response(JSON.stringify([]), { headers: { "content-type": "application/json" } });
 
       return new Response(
         JSON.stringify(
