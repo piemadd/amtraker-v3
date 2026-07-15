@@ -24,8 +24,20 @@ let lastUpdatedTime = {
   updatedAtChicagoPlain: "Wednesday, December 31, 1969 at 6:00:00 PM CST"
 };
 
-let staleData = { avgLastUpdate: 0, activeTrains: 0, stale: false };
-let servedStaleData = { avgLastUpdate: 0, activeTrains: 0, stale: false };
+let staleData = {
+  avgLastUpdate: 0,
+  medianLastUpdate: 0,
+  lastUpdatedArr: [] as object[],
+  activeTrains: 0,
+  stale: false
+};
+let servedStaleData = {
+  avgLastUpdate: 0,
+  medianLastUpdate: 0,
+  lastUpdatedArr: [] as object[],
+  activeTrains: 0,
+  stale: false
+};
 
 let shitsFucked = false;
 
@@ -319,6 +331,8 @@ const updateTrains = async () => {
 
   staleData.activeTrains = 0;
   staleData.avgLastUpdate = 0;
+  staleData.medianLastUpdate = 0;
+  staleData.lastUpdatedArr = [];
   staleData.stale = false;
 
   /*
@@ -562,10 +576,10 @@ const updateTrains = async () => {
     trains["b" + trainNum].push(train);
 
     if (train.trainState === "Active") {
-      staleData.avgLastUpdate += nowCleaning - new Date(train.lastValTS).valueOf();
+      const timeSinceUpdate = Math.max(nowCleaning - new Date(train.lastValTS).valueOf(), 0);
+      staleData.avgLastUpdate += timeSinceUpdate;
+      staleData.lastUpdatedArr.push({ timeSince: timeSinceUpdate, trainID: train.trainID });
       staleData.activeTrains++;
-
-      //console.log(train.trainNum, train.lastValTS, nowCleaning - new Date(train.lastValTS).valueOf(), nowCleaning - new Date(train.lastValTS).valueOf() > (1000 * 60 * 15))
     }
   });
 
@@ -702,7 +716,9 @@ const updateTrains = async () => {
     trains[actualTrainNum].push(train);
 
     if (train.trainState === "Active") {
-      staleData.avgLastUpdate += nowCleaning - new Date(train.lastValTS).valueOf();
+      const timeSinceUpdate = Math.max(nowCleaning - new Date(train.lastValTS).valueOf(), 0);
+      staleData.avgLastUpdate += timeSinceUpdate;
+      staleData.lastUpdatedArr.push({ timeSince: timeSinceUpdate, trainID: train.trainID });
       staleData.activeTrains++;
 
       //console.log(train.trainNum, train.lastValTS, nowCleaning - new Date(train.lastValTS).valueOf(), nowCleaning - new Date(train.lastValTS).valueOf() > (1000 * 60 * 15))
@@ -902,10 +918,10 @@ const updateTrains = async () => {
     trains[rawTrainData.trainnum].push(train);
 
     if (train.trainState === "Active") {
-      staleData.avgLastUpdate += nowCleaning - new Date(train.lastValTS).valueOf();
+      const timeSinceUpdate = Math.max(nowCleaning - new Date(train.lastValTS).valueOf(), 0);
+      staleData.avgLastUpdate += timeSinceUpdate;
+      staleData.lastUpdatedArr.push({ timeSince: timeSinceUpdate, trainID: train.trainID });
       staleData.activeTrains++;
-
-      //console.log(train.trainID, train.lastValTS, nowCleaning - new Date(train.lastValTS).valueOf(), nowCleaning - new Date(train.lastValTS).valueOf() > (1000 * 60 * 15))
     }
   });
 
@@ -925,9 +941,21 @@ const updateTrains = async () => {
     });
   });
 
-  staleData.avgLastUpdate = staleData.avgLastUpdate / staleData.activeTrains;
+  const getMedianOfArry = (arr: any[]) => {
+    if (arr.length == 0) return 0; // no objects
 
-  if (staleData.avgLastUpdate > 1000 * 60 * 20) {
+    // sorting
+    arr = arr.sort((a, b) => a.timeSince - b.timeSince);
+
+    const half = Math.floor(arr.length / 2);
+
+    return arr.length % 2 ? arr[half].timeSince : (arr[half - 1].timeSince + arr[half].timeSince) / 2;
+  };
+
+  staleData.avgLastUpdate = staleData.avgLastUpdate / staleData.activeTrains;
+  staleData.medianLastUpdate = getMedianOfArry(staleData.lastUpdatedArr);
+
+  if (staleData.medianLastUpdate > 1000 * 60 * 20) {
     console.log("Data is stale, setting...");
     staleData.stale = true;
   }
