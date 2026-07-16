@@ -308,7 +308,7 @@ const updateTrains = async () => {
     const actualCode = amtrakStationCodeReplacements[station.properties.Code] ?? station.properties.Code;
 
     const stationObj = {
-      name: stationMetaData.stationNames[station.properties.Code],
+      name: stationMetaData.stationNames[station.properties.Code] ?? station.properties.StationName,
       code: actualCode,
       tz: stationMetaData.timeZones[station.properties.Code],
       lat: station.properties.lat,
@@ -907,7 +907,7 @@ const updateTrains = async () => {
       return { ...stationRaw, stopIconColor: calculateIconColor(train, allStations, stationRaw.code)["color"] };
     });
 
-    if (train.trainState === "Predeparture" && true) {
+    if (train.trainState === "Predeparture") {
       const initialDeparture = new Date(train.stations[0].dep ?? train.stations[0].arr);
 
       // dont include train if more than an hour until departure
