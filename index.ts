@@ -14,7 +14,16 @@ import * as stationMetaData from "./data/stations";
 import { amtrakStationCodeReplacements } from "./data/sharedStations";
 import cache from "./cache";
 
-const rawStations = JSON.parse(fs.readFileSync("./rawStations.json", { encoding: "utf8" }));
+let rawStations: { features: any[] } = { features: [] };
+try {
+  rawStations = JSON.parse(fs.readFileSync("./rawStations.json", { encoding: "utf8" }));
+} catch (e) {
+  // Falls back to an empty feature set rather than crashing the process at
+  // boot — this data is itself only used as a fallback (see updateTrains,
+  // when the live proxied feed reports zero station features), so an empty
+  // fallback-of-a-fallback degrades gracefully instead of preventing startup.
+  console.log("Failed to load rawStations.json, starting with an empty fallback station list:", e);
+}
 
 import calculateIconColor from "./calculateIconColor";
 
@@ -24,34 +33,37 @@ let lastUpdatedTime = {
   updatedAtChicagoPlain: "Wednesday, December 31, 1969 at 6:00:00 PM CST"
 };
 
-let staleData = {
-  avgLastUpdate: 0,
-  medianLastUpdate: 0,
-  lastUpdatedArr: [] as object[],
-  activeTrains: 0,
-  stale: false
-};
-let servedStaleData = {
-  avgLastUpdate: 0,
-  medianLastUpdate: 0,
-  lastUpdatedArr: [] as object[],
-  activeTrains: 0,
-  stale: false
-};
-
-let shitsFucked = false;
+import {
+  staleData,
+  providerStaleData,
+  endpointHealth,
+  resetCycleStaleness,
+  finalizeStaleness,
+  getServedStaleData,
+  getServedProviderStaleData,
+  markEndpointSuccess,
+  markEndpointFailure,
+  getEndpointHealthSnapshot,
+  getShitsFucked
+} from "./health";
 
 const amtrakerCache = new cache();
 let decryptedTrainData = "";
 let decryptedStationData = "";
 let AllTTMTrains = "";
 let trainPlatforms: any = {};
-let brightlineData: any = {};
+// Initialized with the shape updateTrains() expects, not just {} — a
+// cold-start fetch failure (before any successful Brightline fetch) was
+// crashing on Object.keys(brightlineData.trains) because .trains didn't
+// exist yet, discovered by actually running the patched server end-to-end.
+let brightlineData: any = { trains: {}, stations: {} };
 let brightlinePlatforms = {};
 let additionalVIAStops = {};
 let additionalVIAAlerts = {};
 
 let topIPs = {};
+let lastGoodAmtrakAlertsData: any = { trains: {} };
+let lastGoodProxiedData: any = null;
 
 //https://stackoverflow.com/questions/196972/convert-string-to-title-case-with-javascript
 const title = (str: string) => {
@@ -102,62 +114,27 @@ const ccDegToCardinal = (deg: number) => {
 
 const parseDate = (badDate: string | null, code: string | null) => {
   if (code == null) code = "America/New_York";
-
-  if (badDate == null || code == null) return null;
-
-  //first is standard time, second is daylight savings
-  const offsets: any = {
-    "America/New_York": ["-05:00", "-04:00"],
-    "America/Detroit": ["-05:00", "-04:00"],
-    "America/Chicago": ["-06:00", "-05:00"],
-    "America/Denver": ["-07:00", "-06:00"],
-    "America/Phoenix": ["-07:00", "-07:00"],
-    "America/Los_Angeles": ["-08:00", "-07:00"],
-    "America/Boise": ["-07:00", "-06:00"],
-    "America/Toronto": ["-05:00", "-04:00"],
-    "America/Indiana/Indianapolis": ["-05:00", "-04:00"],
-    "America/Kentucky/Louisville": ["-05:00", "-04:00"],
-    "America/Vancouver": ["-08:00", "-07:00"]
-  };
+  if (badDate == null) return null;
 
   const timeZone: string = stationMetaData.timeZones[code] ?? "America/New_York";
 
   try {
-    const dateArr = badDate.split(" ");
-    let MDY = dateArr[0].split("/").map((num) => Number(num));
-    let HMS = dateArr[1].split(":").map((num) => Number(num));
+    // Raw feed sends either 24-hour ("MM/DD/YYYY HH:mm:ss") or 12-hour with
+    // an AM/PM suffix ("MM/DD/YYYY hh:mm:ss A"); also normalize the observed
+    // "hour 24" quirk (meant to represent the 12:00-12:59pm hour) before parsing.
+    const normalized = badDate.replace(/^(\d{1,2}\/\d{1,2}\/\d{4}) 24:/, "$1 12:");
 
-    if (dateArr.length == 3 && dateArr[2] == "PM") {
-      HMS[0] += 12; //adds 12 hour difference for time zone
+    const parsed = moment.tz(normalized, ["MM/DD/YYYY HH:mm:ss", "MM/DD/YYYY hh:mm:ss A"], true, timeZone);
+
+    if (!parsed.isValid()) {
+      console.log("Couldn't parse date:", badDate, code);
+      return null;
     }
 
-    if (dateArr.length == 3 && dateArr[2] == "AM" && HMS[0] == 12) {
-      HMS[0] = 0; //12 AM is 0 hour
-    }
-
-    if (HMS[0] == 24) {
-      HMS[0] = 12;
-      //edge case for 12:00pm - 12:59pm
-    }
-
-    const month = MDY[0].toString().padStart(2, "0");
-    const date = MDY[1].toString().padStart(2, "0");
-    const year = MDY[2].toString().padStart(4, "0");
-
-    const hour = HMS[0].toString().padStart(2, "0");
-    const minute = HMS[1].toString().padStart(2, "0");
-    const second = HMS[2].toString().padStart(2, "0");
-
-    const now = new Date();
-    const nowYear = now.getFullYear();
-    let dst_start = new Date(nowYear, 2, 14);
-    let dst_end = new Date(nowYear, 10, 7);
-    dst_start.setDate(14 - dst_start.getDay()); // adjust date to 2nd Sunday
-    dst_end.setDate(7 - dst_end.getDay()); // adjust date to the 1st Sunday
-
-    const isDST = Number(now >= dst_start && now < dst_end);
-
-    return `${year}-${month}-${date}T${hour}:${minute}:${second}${offsets[timeZone][isDST]}`;
+    // moment-timezone resolves standard-time vs. daylight-saving based on the
+    // date being parsed, not on today's date, and covers every IANA zone in
+    // stationMetaData.timeZones rather than a hardcoded 11-zone table.
+    return parsed.format("YYYY-MM-DDTHH:mm:ssZ");
   } catch (e) {
     console.log("Couldn't parse date:", badDate, code);
     return null;
@@ -263,45 +240,112 @@ const parseRawStation = (rawStation: RawStation, rawTrain: any, rawTrainNum: str
   } as Station;
 };
 
+// Reliability structure of this function, for a reviewer new to it:
+//   1. Each of the 4 upstream fetches (platforms, alerts, brightline, proxy)
+//      is independently try/caught and falls back to its last-known-good
+//      data on failure — one feed failing no longer blocks the others.
+//   2. Each provider's processing loop (Brightline/VIA/Amtrak) is also
+//      independently try/caught, so a malformed record from one provider
+//      can't discard data already computed from the other two this cycle.
+//   3. The whole function is called via safeUpdateTrains() below, which
+//      catches any remaining failure so it can never crash the process or
+//      produce an unhandled rejection on the 15s interval that drives it.
+//   4. Health/staleness state for all of the above lives in ./health.ts —
+//      see markEndpointSuccess/markEndpointFailure calls throughout.
 const updateTrains = async () => {
   console.log("Updating trains...");
-  shitsFucked = false;
 
-  const platformRes = await fetch("https://platformsapi.amtraker.com/stations");
+  // Platform data is treated as best-effort/non-critical: log the failure so
+  // it's visible, but don't let it take down the rest of the update cycle.
   try {
+    const platformRes = await fetch("https://platformsapi.amtraker.com/stations");
     trainPlatforms = await platformRes.json();
+    markEndpointSuccess("platforms");
   } catch (e) {
+    console.log("Failed to fetch/parse train platforms, continuing without platform data:", e);
     trainPlatforms = {};
+    markEndpointFailure("platforms", e);
   }
 
-  const amtrakAlertsData = await fetch(
-    "https://store.transitstat.us/amtrak_alerts" +
-      (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : "")
-  ).then((res) => res.json());
+  // Each upstream feed is independent — a failure in one (e.g. Brightline)
+  // should degrade only that feed, not block Amtrak/VIA/station processing
+  // that already succeeded this cycle. Each falls back to its last known
+  // good payload on failure, rather than aborting the whole update.
+  let amtrakAlertsData: any = lastGoodAmtrakAlertsData;
+  try {
+    amtrakAlertsData = await fetch(
+      "https://store.transitstat.us/amtrak_alerts" +
+        (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : "")
+    ).then((res) => res.json());
+    lastGoodAmtrakAlertsData = amtrakAlertsData;
+    markEndpointSuccess("amtrakAlerts");
+  } catch (e) {
+    console.log("Failed to fetch amtrak_alerts, using last known good data:", e);
+    markEndpointFailure("amtrakAlerts", e);
+  }
 
-  const brightlineRes = await fetch(
-    "https://store.transitstat.us/brightline" +
-      (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : "")
-  );
-  const rawBrightline: any = await brightlineRes.json();
-  brightlineData = rawBrightline["v1"];
-  brightlinePlatforms = rawBrightline["platforms"];
+  try {
+    const brightlineRes = await fetch(
+      "https://store.transitstat.us/brightline" +
+        (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : "")
+    );
+    const rawBrightline: any = await brightlineRes.json();
+    brightlineData = rawBrightline["v1"];
+    brightlinePlatforms = rawBrightline["platforms"];
+    markEndpointSuccess("brightline");
+  } catch (e) {
+    console.log("Failed to fetch brightline feed, using last known good data:", e);
+    // brightlineData/brightlinePlatforms intentionally left as their
+    // previous values (module-level) rather than reset to {}.
+    markEndpointFailure("brightline", e);
+  }
 
   let trains: TrainResponse = {};
   let allStations: StationResponse = {};
 
-  const allProxiedData: any = await fetch(
-    "https://store.transitstat.us/amtrak_fetch_proxy" +
-      (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : "")
-  ).then((res) => res.json());
-  const viaData = allProxiedData.trainDataVIA;
+  let allProxiedData: any = lastGoodProxiedData;
+  try {
+    allProxiedData = await fetch(
+      "https://store.transitstat.us/amtrak_fetch_proxy" +
+        (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : "")
+    ).then((res) => res.json());
+    lastGoodProxiedData = allProxiedData;
+    markEndpointSuccess("proxyFeed");
+  } catch (e) {
+    console.log("Failed to fetch amtrak_fetch_proxy, using last known good data:", e);
+    markEndpointFailure("proxyFeed", e);
+  }
+
+  if (!allProxiedData) {
+    // No successful fetch has ever completed (e.g. fails on first boot) —
+    // nothing to fall back to, so surface it clearly rather than crashing
+    // deep inside the parsing logic below on undefined data.
+    throw new Error("amtrak_fetch_proxy has never succeeded; no cached data to fall back to.");
+  }
+
+  // Previously unguarded — a proxy response missing `trainStations` (valid
+  // JSON, wrong shape) crashed here, outside all 3 provider try/catches
+  // below, aborting the WHOLE cycle even when platforms/alerts/brightline
+  // all fetched fine in the same tick. Discovered by actually running the
+  // patched server against a malformed fixture, not by static review.
+  const viaData = allProxiedData.trainDataVIA ?? {};
   const stationData =
-    allProxiedData.trainStations.features.length > 0 ? allProxiedData.trainStations.features : rawStations.features;
-  const amtrakData = mergeAmtrakFeeds(allProxiedData.trainDataMain, allProxiedData.trainDataASMAD).features;
-  AllTTMTrains = JSON.stringify(allProxiedData.trainDataASMAD);
-  lastUpdatedTime = allProxiedData.updatedTime;
+    allProxiedData.trainStations?.features?.length > 0 ? allProxiedData.trainStations.features : rawStations.features;
+  const amtrakData = mergeAmtrakFeeds(
+    allProxiedData.trainDataMain ?? { features: [] },
+    allProxiedData.trainDataASMAD ?? { features: [] }
+  ).features;
+  AllTTMTrains = JSON.stringify(allProxiedData.trainDataASMAD ?? {});
+  lastUpdatedTime = allProxiedData.updatedTime ?? lastUpdatedTime;
   decryptedTrainData = JSON.stringify(amtrakData);
   decryptedStationData = JSON.stringify(stationData);
+  // Per-feed staleness is now visible via getEndpointHealthSnapshot() /
+  // the health endpoint below — this legacy aggregate flag stays only for
+  // the median-update-age check further down, unrelated to fetch failures.
+  if (!endpointHealth.proxyFeed.lastSuccessAt || endpointHealth.proxyFeed.consecutiveFailures > 0) {
+    staleData.stale = true;
+
+  }
 
   console.log("fetched s");
   stationData.forEach((station: any) => {
@@ -329,154 +373,16 @@ const updateTrains = async () => {
   console.log("fetched t");
   const nowCleaning: number = new Date().valueOf();
 
-  staleData.activeTrains = 0;
-  staleData.avgLastUpdate = 0;
-  staleData.medianLastUpdate = 0;
-  staleData.lastUpdatedArr = [];
-  staleData.stale = false;
+  resetCycleStaleness();
 
-  /*
-  // BEGIN SANTA
-  let santaTrain: Train = {
-    routeName: `Santa Claus`,
-    trainNum: `SC1225`,
-    trainNumRaw: '1225',
-    trainID: `SC1225-25`,
-    lat: trainData.lat,
-    lon: trainData.lon,
-    trainTimely: "",
-    iconColor: '#a80000',
-    textColor: '#ffffff',
-    stations: trainData.predictions.sort((a, b) => a.rawETA - b.rawETA).map((prediction) => {
-      const stationMeta = cpkcHolidayTrainData.stations[prediction.stationID];
-
-      if (!allStations[prediction.stationID]) {
-        allStations[prediction.stationID] = {
-          name: prediction.stationName,
-          code: prediction.stationID,
-          tz: prediction.tz,
-          lat: stationMeta.lat,
-          lon: stationMeta.lon,
-          hasAddress: false,
-          address1: "",
-          address2: "",
-          city: "",
-          state: "",
-          zip: "",
-          trains: [],
-        }
-      }
-
-      allStations[prediction.stationID].trains.push(`CP${trainKey}-25`);
-
-      const arr = new Date(prediction.arr ?? prediction.dep);
-      const dep = new Date(prediction.dep ?? prediction.arr);
-
-      const arrString = arr.toISOString();
-      const depString = dep.toISOString();
-
-      const arrNum = arr.valueOf();
-      const depNum = arr.valueOf();
-
-      const now = Date.now();
-
-      return {
-        name: prediction.stationName,
-        code: prediction.stationID,
-        tz: "America/Chicago",
-        bus: false,
-        schArr: arrString,
-        schDep: depString,
-        arr: arrString,
-        dep: depString,
-        arrCmnt: "",
-        depCmnt: "",
-        status: now < arrNum ? "Enroute" : (
-          now > arrNum && now < depNum ? "Station" : "Departed"
-        ),
-        stopIconColor: "#267300",
-        platform: ""
-      };
-    }),
-    heading: trainData.headingLetter,
-    eventCode: 'CPKC',
-    eventTZ: 'America/Chicago',
-    eventName: 'Christmas',
-    origCode: 'CPKC',
-    originTZ: 'America/Chicago',
-    origName: 'Christmas',
-    destCode: 'CPKC',
-    destTZ: 'America/Chicago',
-    destName: 'Christmas',
-    trainState: "Active",
-    velocity: 0, // no data unfortunately
-    statusMsg: " ",
-    createdAt: cpkcHolidayTrainData['lastUpdated'] ?? new Date().toISOString(),
-    updatedAt: cpkcHolidayTrainData['lastUpdated'] ?? new Date().toISOString(),
-    lastValTS: cpkcHolidayTrainData['lastUpdated'] ?? new Date().toISOString(),
-    objectID: Number(trainKey),
-    provider: "Canadian Pacific Kansas City",
-    providerShort: "CPKC",
-    onlyOfTrainNum: true,
-    alerts: [],
-  };
-
-  const firstStation = train.stations[0];
-  const lastStation = train.stations[train.stations.length - 1];
-  const upcomingStation = train.stations.find((station) => station.status == 'Enroute' || station.status == 'Station') ?? lastStation;
-
-  train.origCode = firstStation.code;
-  train.originTZ = firstStation.tz;
-  train.origName = firstStation.name;
-  train.eventCode = upcomingStation.code;
-  train.eventName = upcomingStation.name;
-  train.eventTZ = upcomingStation.tz;
-  train.destCode = lastStation.code;
-  train.destName = lastStation.name;
-  train.destTZ = lastStation.tz;
-
-  train.stations.push({
-    name: "Christmas",
-    code: "CPKC",
-    tz: "America/Chicago",
-    bus: false,
-    schArr: "2025-12-25T00:00:00-06:00",
-    schDep: "2025-12-25T00:00:00-06:00",
-    arr: "2025-12-25T00:00:00-06:00",
-    dep: "2025-12-25T00:00:00-06:00",
-    arrCmnt: "",
-    depCmnt: "",
-    status: "Enroute",
-    stopIconColor: "#267300",
-    platform: ""
-  });
-
-  if (!allStations['CPKC']) {
-    allStations['CPKC'] = {
-      name: 'Christmas',
-      code: 'CPKC',
-      tz: 'America/Chicago',
-      lat: 83.29825041784702,
-      lon: -34.49599261128057,
-      hasAddress: true,
-      address1: "This is a work in progress, actual stop times are coming.",
-      address2: "",
-      city: "",
-      state: "",
-      zip: "",
-      trains: [],
-    }
-  }
-
-  allStations['CPKC'].trains.push(`CP${trainKey}-25`);
-
-  trains[`CP${trainKey}`] = [train];
-
-  // END SANTA
-  */
-
+  try {
   Object.keys(brightlineData["trains"]).forEach((trainNum) => {
     const rawTrainData = brightlineData["trains"][trainNum];
+
+    if (!rawTrainData.predictions || rawTrainData.predictions.length === 0) {
+      console.log("Skipping Brightline train with no predictions:", trainNum);
+      return;
+    }
 
     if (!rawTrainData.realTime && nowCleaning < rawTrainData.predictions[0].dep - 1000 * 60 * 60) return; // train is scheduled and should not be shown on Amtraker unless within 1 hour of dep
 
@@ -580,13 +486,37 @@ const updateTrains = async () => {
       staleData.avgLastUpdate += timeSinceUpdate;
       staleData.lastUpdatedArr.push({ timeSince: timeSinceUpdate, trainID: train.trainID });
       staleData.activeTrains++;
+
+      providerStaleData.brightline.avgLastUpdate += timeSinceUpdate;
+      providerStaleData.brightline.lastUpdatedArr.push({ timeSince: timeSinceUpdate, trainID: train.trainID });
+      providerStaleData.brightline.activeTrains++;
     }
   });
+    markEndpointSuccess("brightlineProcessing");
+  } catch (e) {
+    // A malformed record here previously aborted the entire update cycle,
+    // discarding already-computed VIA/Amtrak data further down. Now it's
+    // contained to Brightline: trains/allStations keep whatever Brightline
+    // entries were added before the failure, and processing continues.
+    console.log("Failed while processing Brightline data, continuing with other providers:", e);
+    markEndpointFailure("brightlineProcessing", e);
+  }
 
+  try {
   Object.keys(viaData).forEach((trainNum) => {
     const rawTrainData = viaData[trainNum];
     const actualTrainNum = "v" + trainNum.split(" ")[0];
     if (!rawTrainData.departed) return; //train doesn't exist
+
+    if (!rawTrainData.times || rawTrainData.times.length === 0) {
+      // Previously fell through to trainEventStation being undefined and
+      // throwing later — one record like this aborted ALL VIA processing
+      // for the tick (contained to VIA by the outer try/catch, but still
+      // losing every other VIA train that tick over a single bad record).
+      console.log("Skipping VIA train with no times:", trainNum);
+      return;
+    }
+
     if (actualTrainNum == "v97" || actualTrainNum == "v98") {
       //covered by amtrak, but we need to add some stops
       const replacements = { v97: "64", v98: "63" };
@@ -614,8 +544,12 @@ const updateTrains = async () => {
       trainNum: `${actualTrainNum}`,
       trainNumRaw: trainNum.split(" ")[0],
       trainID: `${actualTrainNum}-${Number(rawTrainData.instance.split("-")[2])}`,
-      lat: rawTrainData.lat ?? stationMetaData.viaCoords[trainEventStation.code][0],
-      lon: rawTrainData.lng ?? stationMetaData.viaCoords[trainEventStation.code][1],
+      lat:
+        rawTrainData.lat ??
+        (stationMetaData.viaCoords[trainEventStation.code] ? stationMetaData.viaCoords[trainEventStation.code][0] : 0),
+      lon:
+        rawTrainData.lng ??
+        (stationMetaData.viaCoords[trainEventStation.code] ? stationMetaData.viaCoords[trainEventStation.code][1] : 0),
       trainTimely: "",
       iconColor: "#212529",
       textColor: "#ffffff",
@@ -721,10 +655,22 @@ const updateTrains = async () => {
       staleData.lastUpdatedArr.push({ timeSince: timeSinceUpdate, trainID: train.trainID });
       staleData.activeTrains++;
 
+      providerStaleData.via.avgLastUpdate += timeSinceUpdate;
+      providerStaleData.via.lastUpdatedArr.push({ timeSince: timeSinceUpdate, trainID: train.trainID });
+      providerStaleData.via.activeTrains++;
+
       //console.log(train.trainNum, train.lastValTS, nowCleaning - new Date(train.lastValTS).valueOf(), nowCleaning - new Date(train.lastValTS).valueOf() > (1000 * 60 * 15))
     }
   });
+    markEndpointSuccess("viaProcessing");
+  } catch (e) {
+    // Contained to VIA: Brightline data added earlier and any Amtrak data
+    // added below are unaffected by a bad VIA record.
+    console.log("Failed while processing VIA data, continuing with other providers:", e);
+    markEndpointFailure("viaProcessing", e);
+  }
 
+  try {
   amtrakData.forEach((property: any) => {
     let rawTrainData = property.properties;
 
@@ -732,7 +678,12 @@ const updateTrains = async () => {
 
     let rawStations: Array<RawStation> = [];
 
-    for (let i = 1; i < 47; i++) {
+    // Safety cap raised well above any known route length, purely to bound
+    // the loop — previously a hard cutoff at 46 that would silently drop
+    // any stops beyond it with no warning. Log if we ever actually reach it,
+    // since that means a real train is longer than we've ever seen.
+    const STATION_FIELD_SAFETY_CAP = 100;
+    for (let i = 1; i < STATION_FIELD_SAFETY_CAP; i++) {
       let station = rawTrainData[`station${i}`];
       if (station == undefined || !station) {
         continue;
@@ -746,6 +697,11 @@ const updateTrains = async () => {
           continue;
         }
       }
+    }
+    if (rawTrainData[`station${STATION_FIELD_SAFETY_CAP}`]) {
+      console.log(
+        `Train ${rawTrainData.trainnum} has stations at/beyond field ${STATION_FIELD_SAFETY_CAP} — safety cap may be truncating stops.`
+      );
     }
 
     let stations = rawStations.map((station) => {
@@ -922,8 +878,19 @@ const updateTrains = async () => {
       staleData.avgLastUpdate += timeSinceUpdate;
       staleData.lastUpdatedArr.push({ timeSince: timeSinceUpdate, trainID: train.trainID });
       staleData.activeTrains++;
+
+      providerStaleData.amtrak.avgLastUpdate += timeSinceUpdate;
+      providerStaleData.amtrak.lastUpdatedArr.push({ timeSince: timeSinceUpdate, trainID: train.trainID });
+      providerStaleData.amtrak.activeTrains++;
     }
   });
+    markEndpointSuccess("amtrakProcessing");
+  } catch (e) {
+    // Contained to Amtrak: Brightline/VIA data added earlier this cycle are
+    // unaffected by a bad Amtrak record.
+    console.log("Failed while processing Amtrak data, continuing with other providers:", e);
+    markEndpointFailure("amtrakProcessing", e);
+  }
 
   // setting onlyOfTrainNum and deduplicating at the same time
   Object.keys(trains).forEach((trainNum) => {
@@ -941,66 +908,59 @@ const updateTrains = async () => {
     });
   });
 
-  const getMedianOfArry = (arr: any[]) => {
-    if (arr.length == 0) return 0; // no objects
-
-    // sorting
-    arr = arr.sort((a, b) => a.timeSince - b.timeSince);
-
-    const half = Math.floor(arr.length / 2);
-
-    return arr.length % 2 ? arr[half].timeSince : (arr[half - 1].timeSince + arr[half].timeSince) / 2;
-  };
-
-  staleData.avgLastUpdate = staleData.avgLastUpdate / staleData.activeTrains;
-  staleData.medianLastUpdate = getMedianOfArry(staleData.lastUpdatedArr);
-
-  if (staleData.medianLastUpdate > 1000 * 60 * 20) {
-    console.log("Data is stale, setting...");
-    staleData.stale = true;
-  }
-
-  servedStaleData = JSON.parse(JSON.stringify(staleData));
+  finalizeStaleness();
 
   // refreshing VIA stations that have 0 trains
-  Object.keys(stationMetaData.viaStationNames).forEach((stationCode) => {
-    if (!allStations[stationCode]) {
-      allStations[stationCode] = {
-        name: stationMetaData.viaStationNames[stationCode],
-        code: stationCode,
-        tz: stationMetaData.viatimeZones[stationCode],
-        lat: stationMetaData.viaCoords[stationCode][0],
-        lon: stationMetaData.viaCoords[stationCode][1],
-        hasAddress: false,
-        address1: "",
-        address2: "",
-        city: "",
-        state: "",
-        zip: "",
-        trains: []
-      };
-    }
-  });
+  try {
+    Object.keys(stationMetaData.viaStationNames).forEach((stationCode) => {
+      if (!allStations[stationCode]) {
+        allStations[stationCode] = {
+          name: stationMetaData.viaStationNames[stationCode],
+          code: stationCode,
+          tz: stationMetaData.viatimeZones[stationCode],
+          lat: stationMetaData.viaCoords[stationCode] ? stationMetaData.viaCoords[stationCode][0] : 0,
+          lon: stationMetaData.viaCoords[stationCode] ? stationMetaData.viaCoords[stationCode][1] : 0,
+          hasAddress: false,
+          address1: "",
+          address2: "",
+          city: "",
+          state: "",
+          zip: "",
+          trains: []
+        };
+      }
+    });
 
-  // doing the same with brightline
-  Object.keys(brightlineData["stations"]).forEach((stationCode) => {
-    if (!allStations[stationCode]) {
-      allStations[stationCode] = {
-        name: brightlineData["stations"][stationCode]["stationName"],
-        code: stationCode,
-        tz: brightlineData["stations"][stationCode]["tz"],
-        lat: brightlineData["stations"][stationCode]["lat"],
-        lon: brightlineData["stations"][stationCode]["lon"],
-        hasAddress: false,
-        address1: "",
-        address2: "",
-        city: "",
-        state: "",
-        zip: "",
-        trains: []
-      };
-    }
-  });
+    // doing the same with brightline
+    Object.keys(brightlineData["stations"]).forEach((stationCode) => {
+      if (!allStations[stationCode]) {
+        allStations[stationCode] = {
+          name: brightlineData["stations"][stationCode]["stationName"],
+          code: stationCode,
+          tz: brightlineData["stations"][stationCode]["tz"],
+          lat: brightlineData["stations"][stationCode]["lat"],
+          lon: brightlineData["stations"][stationCode]["lon"],
+          hasAddress: false,
+          address1: "",
+          address2: "",
+          city: "",
+          state: "",
+          zip: "",
+          trains: []
+        };
+      }
+    });
+    markEndpointSuccess("stationRefresh");
+  } catch (e) {
+    // Previously unguarded: a failure here (e.g. a missing viaCoords entry)
+    // ran after all three provider loops had already succeeded, and — since
+    // nothing caught it here — aborted the entire cycle's cache commit
+    // below, discarding that already-good data. Now it's contained to just
+    // the station-refresh step, and whatever providers/stations were
+    // already in `trains`/`allStations` still get committed.
+    console.log("Failed while refreshing VIA/Brightline station entries, committing what succeeded so far:", e);
+    markEndpointFailure("stationRefresh", e);
+  }
 
   Object.keys(allStations).forEach((stationKey) => {
     amtrakerCache.setStation(stationKey, allStations[stationKey]);
@@ -1010,9 +970,23 @@ const updateTrains = async () => {
   console.log("set trains cache");
 };
 
-updateTrains();
+const safeUpdateTrains = async () => {
+  try {
+    await updateTrains();
+    markEndpointSuccess("updateCycle");
+  } catch (e) {
+    // Previously an unhandled rejection on every failed tick (every 15s).
+    // Upstream fetch failures/malformed JSON now surface here instead of
+    // crashing/hanging the process, and the per-endpoint health snapshot
+    // reflects it (see getEndpointHealthSnapshot() / the health endpoint).
+    console.log("updateTrains() failed entirely:", e);
+    markEndpointFailure("updateCycle", e);
+  }
+};
 
-setInterval(() => updateTrains(), 1000 * 15); // every 15 seconds
+safeUpdateTrains();
+
+setInterval(() => safeUpdateTrains(), 1000 * 15); // every 15 seconds
 
 const cleanUpIPs = () => {
   Object.keys(topIPs)
@@ -1080,12 +1054,23 @@ const server = Bun.serve({
       const stations = amtrakerCache.getStations();
       const ids = amtrakerCache.getIDs();
 
-      return new Response(JSON.stringify({ trains, stations, ids, shitsFucked, staleData: servedStaleData }), {
-        headers: {
-          "Access-Control-Allow-Origin": "*", // CORS
-          "content-type": "application/json"
+      return new Response(
+        JSON.stringify({
+          trains,
+          stations,
+          ids,
+          shitsFucked: getShitsFucked(),
+          endpointHealth: getEndpointHealthSnapshot(),
+          staleData: getServedStaleData(),
+          providerStaleData: getServedProviderStaleData()
+        }),
+        {
+          headers: {
+            "Access-Control-Allow-Origin": "*", // CORS
+            "content-type": "application/json"
+          }
         }
-      });
+      );
     }
 
     if (url === "/v3/times") {
@@ -1112,12 +1097,27 @@ const server = Bun.serve({
     }
 
     if (url === "/v3/shitsfuckedlmao") {
-      return new Response(shitsFucked.toString(), {
+      // Original response shape preserved (plain boolean text) for existing
+      // consumers — value is now derived live as an OR across the
+      // individual per-endpoint stale flags instead of its own tracked state.
+      return new Response(getShitsFucked().toString(), {
         headers: {
           "Access-Control-Allow-Origin": "*", // CORS
           "content-type": "application/json"
         }
       });
+    }
+
+    if (url === "/v3/health") {
+      return new Response(
+        JSON.stringify({ endpointHealth: getEndpointHealthSnapshot(), providerStaleData: getServedProviderStaleData() }),
+        {
+          headers: {
+            "Access-Control-Allow-Origin": "*", // CORS
+            "content-type": "application/json"
+          }
+        }
+      );
     }
 
     if (url === "/v3/raw") {
@@ -1148,7 +1148,7 @@ const server = Bun.serve({
     }
 
     if (url === "/v3/stale") {
-      return new Response(JSON.stringify(servedStaleData), {
+      return new Response(JSON.stringify({ ...getServedStaleData(), byProvider: getServedProviderStaleData() }), {
         headers: {
           "Access-Control-Allow-Origin": "*", // CORS
           "content-type": "application/json"
@@ -1341,7 +1341,7 @@ const server = Bun.serve({
         ...stations[stationCode],
         trains: stations[stationCode].trains.map((trainID) => {
           const trainsArr = trains[trainID.split("-")[0]];
-          const train = trainsArr.find((train) => train.trainID == trainID);
+          const train = trainsArr?.find((train) => train.trainID == trainID);
 
           const thisStationFull = train?.stations.find((station) => station.code == stationCode);
           const thisStationMin = {
