@@ -13,6 +13,7 @@ import { trainNames, viaTrainNames } from "./data/trains";
 import * as stationMetaData from "./data/stations";
 import { amtrakStationCodeReplacements } from "./data/sharedStations";
 import cache from "./cache";
+import { fetchJSONWithRetry, fetchWithTimeout, assertPlainObject, assertHasKeys } from "./fetchHelpers";
 
 let rawStations: { features: any[] } = { features: [] };
 try {
@@ -44,7 +45,8 @@ import {
   markEndpointSuccess,
   markEndpointFailure,
   getEndpointHealthSnapshot,
-  getShitsFucked
+  getShitsFucked,
+  EndpointName
 } from "./health";
 
 const amtrakerCache = new cache();
@@ -61,9 +63,61 @@ let brightlinePlatforms = {};
 let additionalVIAStops = {};
 let additionalVIAAlerts = {};
 
-let topIPs = {};
 let lastGoodAmtrakAlertsData: any = { trains: {} };
 let lastGoodProxiedData: any = null;
+
+// Each upstream fetch gets a bounded timeout + a couple of quick retries
+// before we give up on the live call and fall back to last-known-good data.
+// Kept well under the 15s tick interval so a slow upstream can't compound
+// into an overlapping cycle on its own.
+const FETCH_TIMEOUT_MS = 8000;
+const FETCH_RETRY_OPTS = { timeoutMs: FETCH_TIMEOUT_MS, retries: 1, backoffMs: 300 };
+
+// If a feed hasn't had a successful fetch in this long, the last-known-good
+// data we're still serving is old enough that it's no longer just "a bit
+// stale" — it's likely wrong (trains have moved on, alerts have changed).
+// This doesn't stop us serving it (breaking response shape/behavior for
+// existing consumers is a bigger risk than serving old data), it just makes
+// that condition loud and visible instead of indistinguishable from normal
+// short-lived staleness.
+const CRITICAL_STALE_AGE_MS = 1000 * 60 * 60; // 1 hour
+
+// Guards against updateTrains() calls overlapping if one run hangs past the
+// 15s interval — without this, two concurrent runs could interleave writes
+// to the shared module-level state (brightlineData, trainPlatforms, the
+// lastGood* fallbacks) and to amtrakerCache.
+let updateInProgress = false;
+
+// Called from a fetch failure's catch block, after markEndpointFailure has
+// already recorded this attempt. Logs distinctly (not just the routine
+// "using last known good data" line) once a feed's last SUCCESS is old
+// enough to cross CRITICAL_STALE_AGE_MS, so sustained multi-hour outages are
+// visible in logs rather than looking identical to a normal short blip.
+const logIfCriticallyStale = (name: EndpointName) => {
+  const lastSuccessAt = endpointHealth[name].lastSuccessAt;
+  if (lastSuccessAt === null) return; // never succeeded — already surfaced elsewhere
+  const ageMs = Date.now() - lastSuccessAt;
+  if (ageMs > CRITICAL_STALE_AGE_MS) {
+    console.log(
+      `WARNING: ${name} has not had a successful fetch in ${Math.round(ageMs / 60000)} minutes — ` +
+        `still serving last-known-good data from that long ago.`
+    );
+  }
+};
+
+// Surfaces staleness on the bulk-data responses (the full train list and
+// /v3/all) via headers rather than injecting fields into the response body.
+// /v3/trains' top-level shape is a flat dict keyed by train number for
+// existing consumers — adding a body field there would look like a
+// malformed/extra train entry. Headers carry the same information without
+// touching that contract.
+const getStalenessHeaders = (): Record<string, string> => {
+  const ageMs = lastUpdatedTime.updatedAt ? Date.now() - lastUpdatedTime.updatedAt : null;
+  return {
+    "X-Data-Stale": getShitsFucked().toString(),
+    "X-Data-Age-Seconds": ageMs === null ? "unknown" : Math.round(ageMs / 1000).toString()
+  };
+};
 
 //https://stackoverflow.com/questions/196972/convert-string-to-title-case-with-javascript
 const title = (str: string) => {
@@ -258,8 +312,8 @@ const updateTrains = async () => {
   // Platform data is treated as best-effort/non-critical: log the failure so
   // it's visible, but don't let it take down the rest of the update cycle.
   try {
-    const platformRes = await fetch("https://platformsapi.amtraker.com/stations");
-    trainPlatforms = await platformRes.json();
+    trainPlatforms = await fetchJSONWithRetry("https://platformsapi.amtraker.com/stations", FETCH_RETRY_OPTS);
+    assertPlainObject(trainPlatforms, "platforms");
     markEndpointSuccess("platforms");
   } catch (e) {
     console.log("Failed to fetch/parse train platforms, continuing without platform data:", e);
@@ -273,23 +327,27 @@ const updateTrains = async () => {
   // good payload on failure, rather than aborting the whole update.
   let amtrakAlertsData: any = lastGoodAmtrakAlertsData;
   try {
-    amtrakAlertsData = await fetch(
+    amtrakAlertsData = await fetchJSONWithRetry(
       "https://store.transitstat.us/amtrak_alerts" +
-        (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : "")
-    ).then((res) => res.json());
+        (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : ""),
+      FETCH_RETRY_OPTS
+    );
+    assertPlainObject(amtrakAlertsData, "amtrak_alerts");
     lastGoodAmtrakAlertsData = amtrakAlertsData;
     markEndpointSuccess("amtrakAlerts");
   } catch (e) {
     console.log("Failed to fetch amtrak_alerts, using last known good data:", e);
     markEndpointFailure("amtrakAlerts", e);
+    logIfCriticallyStale("amtrakAlerts");
   }
 
   try {
-    const brightlineRes = await fetch(
+    const rawBrightline: any = await fetchJSONWithRetry(
       "https://store.transitstat.us/brightline" +
-        (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : "")
+        (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : ""),
+      FETCH_RETRY_OPTS
     );
-    const rawBrightline: any = await brightlineRes.json();
+    assertHasKeys(rawBrightline, ["v1", "platforms"], "brightline");
     brightlineData = rawBrightline["v1"];
     brightlinePlatforms = rawBrightline["platforms"];
     markEndpointSuccess("brightline");
@@ -298,6 +356,7 @@ const updateTrains = async () => {
     // brightlineData/brightlinePlatforms intentionally left as their
     // previous values (module-level) rather than reset to {}.
     markEndpointFailure("brightline", e);
+    logIfCriticallyStale("brightline");
   }
 
   let trains: TrainResponse = {};
@@ -305,15 +364,19 @@ const updateTrains = async () => {
 
   let allProxiedData: any = lastGoodProxiedData;
   try {
-    allProxiedData = await fetch(
+    const fetched = await fetchJSONWithRetry(
       "https://store.transitstat.us/amtrak_fetch_proxy" +
-        (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : "")
-    ).then((res) => res.json());
+        (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : ""),
+      FETCH_RETRY_OPTS
+    );
+    assertPlainObject(fetched, "amtrak_fetch_proxy");
+    allProxiedData = fetched;
     lastGoodProxiedData = allProxiedData;
     markEndpointSuccess("proxyFeed");
   } catch (e) {
     console.log("Failed to fetch amtrak_fetch_proxy, using last known good data:", e);
     markEndpointFailure("proxyFeed", e);
+    logIfCriticallyStale("proxyFeed");
   }
 
   if (!allProxiedData) {
@@ -971,6 +1034,14 @@ const updateTrains = async () => {
 };
 
 const safeUpdateTrains = async () => {
+  if (updateInProgress) {
+    // A previous run is still going (e.g. a hung upstream fetch pushed it
+    // past the 15s tick). Skip this tick rather than starting a second,
+    // overlapping run against the same shared state/cache.
+    console.log("Previous update cycle still in progress, skipping this tick.");
+    return;
+  }
+  updateInProgress = true;
   try {
     await updateTrains();
     markEndpointSuccess("updateCycle");
@@ -981,23 +1052,14 @@ const safeUpdateTrains = async () => {
     // reflects it (see getEndpointHealthSnapshot() / the health endpoint).
     console.log("updateTrains() failed entirely:", e);
     markEndpointFailure("updateCycle", e);
+  } finally {
+    updateInProgress = false;
   }
 };
 
 safeUpdateTrains();
 
 setInterval(() => safeUpdateTrains(), 1000 * 15); // every 15 seconds
-
-const cleanUpIPs = () => {
-  Object.keys(topIPs)
-    .sort((a, b) => topIPs[b].count - topIPs[a].count)
-    .slice(50)
-    .forEach((ip) => {
-      delete topIPs[ip];
-    });
-};
-
-//setInterval(() => cleanUpIPs(), 300 * 1000);
 
 const blocks = [];
 
@@ -1021,11 +1083,6 @@ const server = Bun.serve({
       */
     }
 
-    /*
-    if (!topIPs[ipAddr]) topIPs[ipAddr] = { count: 0, headers: Object.fromEntries(request.headers) };
-    topIPs[ipAddr].count++;
-    */
-
     let url = new URL(request.url).pathname;
 
     if (url.startsWith("/v2")) {
@@ -1033,20 +1090,7 @@ const server = Bun.serve({
     }
 
     if (url === `/v3/ips` && request.url.endsWith(process.env.SUPER_SECRET_ACCESS_KEY)) {
-      //console.log(request.headers)
-
-      //console.log(ipAddr, request.headers.get("x-real-ip"), request.headers)
-
       return new Response(JSON.stringify([]), { headers: { "content-type": "application/json" } });
-
-      return new Response(
-        JSON.stringify(
-          Object.keys(topIPs)
-            .sort((a, b) => topIPs[b].count - topIPs[a].count)
-            .map((ip) => [ip, topIPs[ip].count, topIPs[ip].headers])
-        ),
-        { headers: { "content-type": "application/json" } }
-      );
     }
 
     if (url === "/v3/all") {
@@ -1067,7 +1111,8 @@ const server = Bun.serve({
         {
           headers: {
             "Access-Control-Allow-Origin": "*", // CORS
-            "content-type": "application/json"
+            "content-type": "application/json",
+            ...getStalenessHeaders()
           }
         }
       );
@@ -1258,7 +1303,8 @@ const server = Bun.serve({
         return new Response(JSON.stringify(trains), {
           headers: {
             "Access-Control-Allow-Origin": "*", // CORS
-            "content-type": "application/json"
+            "content-type": "application/json",
+            ...getStalenessHeaders()
           }
         });
       }
