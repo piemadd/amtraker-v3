@@ -50,6 +50,7 @@ let brightlineData: any = {};
 let brightlinePlatforms = {};
 let additionalVIAStops = {};
 let additionalVIAAlerts = {};
+let backupAmtrakStationData: any = {};
 
 let topIPs = {};
 
@@ -274,6 +275,13 @@ const updateTrains = async () => {
     trainPlatforms = {};
   }
 
+  const backupAmtrakStationDataRes = await fetch('https://gtfs.piemadd.com/data/amtrak/stops.json');
+  try {
+    backupAmtrakStationData = await backupAmtrakStationDataRes.json();
+  } catch (e) {
+    backupAmtrakStationData = {};
+  }
+
   const amtrakAlertsData = await fetch(
     "https://store.transitstat.us/amtrak_alerts" +
       (process.env.SUPER_SECRET_CACHE_BUSTING ? `${process.env.SUPER_SECRET_CACHE_BUSTING}&t=${Date.now()}` : "")
@@ -311,8 +319,8 @@ const updateTrains = async () => {
       name: stationMetaData.stationNames[station.properties.Code] ?? station.properties.StationName,
       code: actualCode,
       tz: stationMetaData.timeZones[station.properties.Code],
-      lat: station.properties.lat,
-      lon: station.properties.lon,
+      lat: station.geometry?.coordinates?.[1],
+      lon: station.geometry?.coordinates?.[0],
       hasAddress: true,
       address1: station.properties.Address1,
       address2: station.properties.Address2,
@@ -751,14 +759,15 @@ const updateTrains = async () => {
     let stations = rawStations.map((station) => {
       const actualCode = amtrakStationCodeReplacements[station.code] ?? station.code;
 
+      const backupData = backupAmtrakStationData[station.code];
+
       if (!allStations[actualCode]) {
-        if (!amtrakerCache.stationExists(actualCode)) {
-          amtrakerCache.setStation(actualCode, {
-            name: stationMetaData.stationNames[station.code],
+        const newStation = {
+            name: stationMetaData.stationNames[station.code] ?? backupData.stopName,
             code: actualCode,
-            tz: stationMetaData.timeZones[station.code],
-            lat: 0,
-            lon: 0,
+            tz: stationMetaData.timeZones[station.code] ?? backupData.stopTZ,
+            lat: backupData.stopLat ?? 0,
+            lon: backupData.stopLon ?? 0,
             hasAddress: false,
             address1: "",
             address2: "",
@@ -766,7 +775,11 @@ const updateTrains = async () => {
             state: "",
             zip: "",
             trains: []
-          });
+          };
+
+        if (!amtrakerCache.stationExists(actualCode)) {
+          amtrakerCache.setStation(actualCode, newStation);
+          allStations[actualCode] = newStation;
         }
       }
 
