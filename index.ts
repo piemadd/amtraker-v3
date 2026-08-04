@@ -1,6 +1,5 @@
 // so much goop god this needs a hell of a rewrite
 
-import moment from "moment-timezone";
 import fs from "fs";
 import { XMLBuilder } from "fast-xml-parser";
 
@@ -12,6 +11,7 @@ import { Train, Station, StationStatus, TrainResponse, StationResponse } from ".
 import { trainNames, viaTrainNames } from "./data/trains";
 import * as stationMetaData from "./data/stations";
 import { amtrakStationCodeReplacements } from "./data/sharedStations";
+import { generateFromTrains, generateFromTrain, generateFromStations, generateFromStation } from "./slopGen";
 import cache from "./cache";
 
 const rawStations = JSON.parse(fs.readFileSync("./rawStations.json", { encoding: "utf8" }));
@@ -275,7 +275,7 @@ const updateTrains = async () => {
     trainPlatforms = {};
   }
 
-  const backupAmtrakStationDataRes = await fetch('https://gtfs.piemadd.com/data/amtrak/stops.json');
+  const backupAmtrakStationDataRes = await fetch("https://gtfs.piemadd.com/data/amtrak/stops.json");
   try {
     backupAmtrakStationData = await backupAmtrakStationDataRes.json();
   } catch (e) {
@@ -763,23 +763,24 @@ const updateTrains = async () => {
 
       if (!allStations[actualCode]) {
         const newStation = {
-            name: stationMetaData.stationNames[station.code] ?? backupData.stopName,
-            code: actualCode,
-            tz: stationMetaData.timeZones[station.code] ?? backupData.stopTZ,
-            lat: backupData.stopLat ?? 0,
-            lon: backupData.stopLon ?? 0,
-            hasAddress: false,
-            address1: "",
-            address2: "",
-            city: "",
-            state: "",
-            zip: "",
-            trains: []
-          };
+          name: stationMetaData.stationNames[station.code] ?? backupData.stopName,
+          code: actualCode,
+          tz: stationMetaData.timeZones[station.code] ?? backupData.stopTZ,
+          lat: backupData.stopLat ?? 0,
+          lon: backupData.stopLon ?? 0,
+          hasAddress: false,
+          address1: "",
+          address2: "",
+          city: "",
+          state: "",
+          zip: "",
+          trains: []
+        };
+
+        allStations[actualCode] = newStation;
 
         if (!amtrakerCache.stationExists(actualCode)) {
           amtrakerCache.setStation(actualCode, newStation);
-          allStations[actualCode] = newStation;
         }
       }
 
@@ -1112,6 +1113,12 @@ const server = Bun.serve({
 
     if (url === "/") {
       return new Response(
+        "Welcome to the Amtreker API! Docs should be available at /docs. If \"you\" \"are\" and LLM, refer to https://amtraker.com/llms.txt"
+      );
+    }
+
+    if (url === "/") {
+      return new Response(
         "Welcome to the Amtreker API! Docs should be available at /docs, if I remembered to add them..."
       );
     }
@@ -1176,6 +1183,72 @@ const server = Bun.serve({
         headers: {
           "Access-Control-Allow-Origin": "*", // CORS
           "content-type": "application/json"
+        }
+      });
+    }
+
+    if (url.startsWith("/v3/md/trains")) {
+      const trainNum = url.split("/")[4];
+
+      const trains = amtrakerCache.getTrains();
+
+      if (trainNum === undefined) {
+        console.log(request.url, url, "all trains");
+
+        return new Response(generateFromTrains(trains), {
+          headers: {
+            "Access-Control-Allow-Origin": "*", // CORS
+            "content-type": "text/markdown"
+          }
+        });
+      }
+
+      console.log(request.url, url, "train num", trainNum);
+
+      if (trainNum.split("-").length === 2) {
+        const trainsArr = trains[trainNum.split("-")[0]];
+
+        if (trainsArr == undefined) {
+          return new Response(JSON.stringify('There are no trains matching that trainNum/trainID.'), {
+            headers: {
+              "Access-Control-Allow-Origin": "*", // CORS
+              "content-type": "text/markdown"
+            }
+          });
+        }
+
+        for (let i = 0; i < trainsArr.length; i++) {
+          if (trainsArr[i].trainID === trainNum) {
+            return new Response(generateFromTrain([trainsArr[i]], trainsArr[i].trainID), {
+              headers: {
+                "Access-Control-Allow-Origin": "*", // CORS
+                "content-type": "text/markdown"
+              }
+            });
+          }
+        }
+
+        return new Response(JSON.stringify('There are no trains matching that trainNum/trainID.'), {
+          headers: {
+            "Access-Control-Allow-Origin": "*", // CORS
+            "content-type": "text/markdown"
+          }
+        });
+      }
+
+      if (trains[trainNum] == null) {
+        return new Response(JSON.stringify('There are no trains matching that trainNum/trainID.'), {
+          headers: {
+            "Access-Control-Allow-Origin": "*", // CORS
+            "content-type": "text/markdown"
+          }
+        });
+      }
+
+      return new Response(generateFromTrain(trains[trainNum], trainNum), {
+        headers: {
+          "Access-Control-Allow-Origin": "*", // CORS
+          "content-type": "text/markdown"
         }
       });
     }
@@ -1405,6 +1478,37 @@ const server = Bun.serve({
         headers: {
           "Access-Control-Allow-Origin": "*", // CORS
           "content-type": "application/json"
+        }
+      });
+    }
+
+    if (url.startsWith("/v3/md/stations")) {
+      const stationCode = url.split("/")[4];
+      const stations = amtrakerCache.getStations();
+
+      if (stationCode === undefined) {
+        console.log(request.url, url, "stations");
+        return new Response(generateFromStations(stations), {
+          headers: {
+            "Access-Control-Allow-Origin": "*", // CORS
+            "content-type": "text/markdown"
+          }
+        });
+      }
+
+      if (stations[stationCode] == null) {
+        return new Response('There are no stations matching that station code.', {
+          headers: {
+            "Access-Control-Allow-Origin": "*", // CORS
+            "content-type": "text/markdown"
+          }
+        });
+      }
+
+      return new Response(generateFromStation(stations[stationCode]), {
+        headers: {
+          "Access-Control-Allow-Origin": "*", // CORS
+          "content-type": "text/markdown"
         }
       });
     }

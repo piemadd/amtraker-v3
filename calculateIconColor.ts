@@ -125,7 +125,9 @@ const calculateIconColor = (train: Train, allStations: StationResponse, activeSt
       train.stations = [train.stations[0], train.stations[0]] // bruh
     }
 
-    const basicRouteLine = lineString(train.stations.map((station) => [allStations[station.code].lon, allStations[station.code].lat]));
+    const basicRouteLine = lineString(train.stations.map((station) => {
+      return [allStations[station.code].lon, allStations[station.code].lat];
+    }));
     const trainRouteLength = length(basicRouteLine, { units: 'miles' });
 
     // these are very similar to what ASM does
