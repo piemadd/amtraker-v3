@@ -1113,14 +1113,17 @@ const server = Bun.serve({
 
     if (url === "/") {
       return new Response(
-        "Welcome to the Amtreker API! Docs should be available at /docs. If \"you\" \"are\" and LLM, refer to https://amtraker.com/llms.txt"
+        'Welcome to the Amtreker API! Docs should be available at /docs. If "you" "are" and LLM, refer to https://amtraker.com/llms.txt'
       );
     }
 
-    if (url === "/") {
-      return new Response(
-        "Welcome to the Amtreker API! Docs should be available at /docs, if I remembered to add them..."
-      );
+    if (url === "/ads.json") {
+      return new Response(JSON.stringify({ ads: [], message: "haiiii :3" }), {
+        headers: {
+          "Access-Control-Allow-Origin": "*", // CORS
+          "content-type": "application/json"
+        }
+      });
     }
 
     if (url === "/docs") {
@@ -1209,7 +1212,7 @@ const server = Bun.serve({
         const trainsArr = trains[trainNum.split("-")[0]];
 
         if (trainsArr == undefined) {
-          return new Response(JSON.stringify('There are no trains matching that trainNum/trainID.'), {
+          return new Response(JSON.stringify("There are no trains matching that trainNum/trainID."), {
             headers: {
               "Access-Control-Allow-Origin": "*", // CORS
               "content-type": "text/markdown"
@@ -1228,7 +1231,7 @@ const server = Bun.serve({
           }
         }
 
-        return new Response(JSON.stringify('There are no trains matching that trainNum/trainID.'), {
+        return new Response(JSON.stringify("There are no trains matching that trainNum/trainID."), {
           headers: {
             "Access-Control-Allow-Origin": "*", // CORS
             "content-type": "text/markdown"
@@ -1237,7 +1240,7 @@ const server = Bun.serve({
       }
 
       if (trains[trainNum] == null) {
-        return new Response(JSON.stringify('There are no trains matching that trainNum/trainID.'), {
+        return new Response(JSON.stringify("There are no trains matching that trainNum/trainID."), {
           headers: {
             "Access-Control-Allow-Origin": "*", // CORS
             "content-type": "text/markdown"
@@ -1497,7 +1500,7 @@ const server = Bun.serve({
       }
 
       if (stations[stationCode] == null) {
-        return new Response('There are no stations matching that station code.', {
+        return new Response("There are no stations matching that station code.", {
           headers: {
             "Access-Control-Allow-Origin": "*", // CORS
             "content-type": "text/markdown"
