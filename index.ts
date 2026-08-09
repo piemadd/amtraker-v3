@@ -1117,7 +1117,7 @@ const server = Bun.serve({
       );
     }
 
-    if (url === "/ads.json") {
+    if (url.endsWith("/ads.json")) {
       return new Response(JSON.stringify({ ads: [], message: "haiiii :3" }), {
         headers: {
           "Access-Control-Allow-Origin": "*", // CORS
