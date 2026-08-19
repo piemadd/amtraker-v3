@@ -1039,7 +1039,7 @@ const cleanUpStats = () => {
 
   Object.keys(topUserAgents)
     .sort((a, b) => topUserAgents[b].count - topUserAgents[a].count)
-    .slice(50)
+    .slice(250)
     .forEach((agent) => {
       delete topUserAgents[agent];
     });
