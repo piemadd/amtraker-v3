@@ -1054,7 +1054,7 @@ const server = Bun.serve({
   port: process.env.PORT ?? 3001,
   fetch(request) {
     const ipAddr = request.headers.get("cf-connecting-ip") ?? server.requestIP(request).address;
-    const userAgent = request.headers.get("user-agent") ?? "SAMPLE_USER_AGENT_YES_BLOCK_ME_PLEASE";
+    const userAgent = request.headers.get("user-agent") ?? "NO_USER_AGENT_REQUEST";
     let shouldBlock = false;
 
     if (ipBlocks.includes(ipAddr)) {
