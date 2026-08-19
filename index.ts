@@ -52,7 +52,8 @@ let additionalVIAStops = {};
 let additionalVIAAlerts = {};
 let backupAmtrakStationData: any = {};
 
-let topIPs = {};
+let topIPs: any = {};
+let topUserAgents: any = {};
 
 //https://stackoverflow.com/questions/196972/convert-string-to-title-case-with-javascript
 const title = (str: string) => {
@@ -1028,26 +1029,35 @@ updateTrains();
 
 setInterval(() => updateTrains(), 1000 * 15); // every 15 seconds
 
-const cleanUpIPs = () => {
+const cleanUpStats = () => {
   Object.keys(topIPs)
     .sort((a, b) => topIPs[b].count - topIPs[a].count)
     .slice(50)
     .forEach((ip) => {
       delete topIPs[ip];
     });
+
+  Object.keys(topUserAgents)
+    .sort((a, b) => topUserAgents[b].count - topUserAgents[a].count)
+    .slice(50)
+    .forEach((agent) => {
+      delete topUserAgents[agent];
+    });
 };
 
-//setInterval(() => cleanUpIPs(), 300 * 1000);
+setInterval(() => cleanUpStats(), 300 * 1000);
 
-const blocks = [];
+const ipBlocks: string[] = [];
+const agentBlocks: string[] = [];
 
 const server = Bun.serve({
   port: process.env.PORT ?? 3001,
   fetch(request) {
     const ipAddr = request.headers.get("cf-connecting-ip") ?? server.requestIP(request).address;
+    const userAgent = request.headers.get("user-agent") ?? "SAMPLE_USER_AGENT_YES_BLOCK_ME_PLEASE";
     let shouldBlock = false;
 
-    if (blocks.includes(ipAddr)) {
+    if (ipBlocks.includes(ipAddr)) {
       shouldBlock = true;
       /*
       return new Response(JSON.stringify([]), {
@@ -1061,12 +1071,17 @@ const server = Bun.serve({
       */
     }
 
-    /*
+    if (agentBlocks.includes(userAgent)) {
+      shouldBlock = true;
+    }
+
     if (!topIPs[ipAddr]) topIPs[ipAddr] = { count: 0, headers: Object.fromEntries(request.headers) };
     topIPs[ipAddr].count++;
-    */
 
-    let url = new URL(request.url).pathname;
+    if (!topUserAgents[userAgent]) topUserAgents[userAgent] = { count: 0, headers: Object.fromEntries(request.headers) };
+    topUserAgents[userAgent].count++;
+
+    let url: string = new URL(request.url).pathname;
 
     if (url.startsWith("/v2")) {
       url = url.replace("/v2", "/v3");
@@ -1077,13 +1092,18 @@ const server = Bun.serve({
 
       //console.log(ipAddr, request.headers.get("x-real-ip"), request.headers)
 
-      return new Response(JSON.stringify([]), { headers: { "content-type": "application/json" } });
+      //return new Response(JSON.stringify([]), { headers: { "content-type": "application/json" } });
 
       return new Response(
         JSON.stringify(
-          Object.keys(topIPs)
+          {
+            ips: Object.keys(topIPs)
             .sort((a, b) => topIPs[b].count - topIPs[a].count)
-            .map((ip) => [ip, topIPs[ip].count, topIPs[ip].headers])
+            .map((ip) => [ip, topIPs[ip].count, topIPs[ip].headers]),
+            headers: Object.keys(topUserAgents)
+            .sort((a, b) => topUserAgents[b].count - topUserAgents[a].count)
+            .map((agent) => [agent, topUserAgents[agent].count, topUserAgents[agent].headers])
+          }
         ),
         { headers: { "content-type": "application/json" } }
       );
