@@ -1060,7 +1060,7 @@ const server = Bun.serve({
     let corsHeadersHeader = '*';
     let shouldBlock = false;
 
-    if (referrer.includes('amtraker.com')) corsOriginHeader = referrer;
+    if (referrer.includes('amtraker.com')) corsOriginHeader = referrer.substring(0, referrer.length - 1);;
 
     if (ipBlocks.includes(ipAddr)) {
       shouldBlock = true;
