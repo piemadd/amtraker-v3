@@ -1056,17 +1056,19 @@ const server = Bun.serve({
     const ipAddr = request.headers.get("cf-connecting-ip") ?? server.requestIP(request).address;
     const userAgent = request.headers.get("user-agent") ?? "NO_USER_AGENT_REQUEST";
     const referrer = request.headers.get('referer') ?? 'NO_REFERRER';
-    let corsHeader = '*';
+    let corsOriginHeader = '*';
+    let corsHeadersHeader = '*';
     let shouldBlock = false;
 
-    if (referrer.includes('amtraker.com')) corsHeader = referrer;
+    if (referrer.includes('amtraker.com')) corsOriginHeader = referrer;
 
     if (ipBlocks.includes(ipAddr)) {
       shouldBlock = true;
       /*
       return new Response(JSON.stringify([]), {
         headers: {
-          "Access-Control-Allow-Origin": corsHeader, // CORS
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
           "content-type": "application/json",
           'attribution': "Please provide proper attribution to Amtraker on your website and email me (amtraker@piemadd.com) to have this block removed."
         },
@@ -1120,7 +1122,8 @@ const server = Bun.serve({
 
       return new Response(JSON.stringify({ trains, stations, ids, shitsFucked, staleData: servedStaleData }), {
         headers: {
-          "Access-Control-Allow-Origin": corsHeader, // CORS
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
           "content-type": "application/json"
         }
       });
@@ -1129,7 +1132,8 @@ const server = Bun.serve({
     if (url === "/v3/times") {
       return new Response(JSON.stringify(lastUpdatedTime), {
         headers: {
-          "Access-Control-Allow-Origin": corsHeader, // CORS
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
           "content-type": "application/json"
         }
       });
@@ -1144,7 +1148,8 @@ const server = Bun.serve({
     if (url.endsWith("/ads.json")) {
       return new Response(JSON.stringify({ ads: [], message: "haiiii :3" }), {
         headers: {
-          "Access-Control-Allow-Origin": corsHeader, // CORS
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
           "content-type": "application/json"
         }
       });
@@ -1161,7 +1166,8 @@ const server = Bun.serve({
     if (url === "/v3/shitsfuckedlmao") {
       return new Response(shitsFucked.toString(), {
         headers: {
-          "Access-Control-Allow-Origin": corsHeader, // CORS
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
           "content-type": "application/json"
         }
       });
@@ -1170,7 +1176,8 @@ const server = Bun.serve({
     if (url === "/v3/raw") {
       return new Response(decryptedTrainData, {
         headers: {
-          "Access-Control-Allow-Origin": corsHeader, // CORS
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
           "content-type": "application/json"
         }
       });
@@ -1179,7 +1186,8 @@ const server = Bun.serve({
     if (url === "/v3/rawStations") {
       return new Response(decryptedStationData, {
         headers: {
-          "Access-Control-Allow-Origin": corsHeader, // CORS
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
           "content-type": "application/json"
         }
       });
@@ -1188,7 +1196,8 @@ const server = Bun.serve({
     if (url === "/v3/AllTTMTrains") {
       return new Response(AllTTMTrains, {
         headers: {
-          "Access-Control-Allow-Origin": corsHeader, // CORS
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
           "content-type": "application/json"
         }
       });
@@ -1197,7 +1206,8 @@ const server = Bun.serve({
     if (url === "/v3/stale") {
       return new Response(JSON.stringify(servedStaleData), {
         headers: {
-          "Access-Control-Allow-Origin": corsHeader, // CORS
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
           "content-type": "application/json"
         }
       });
@@ -1208,7 +1218,8 @@ const server = Bun.serve({
       const trainIDs = amtrakerCache.getIDs();
       return new Response(JSON.stringify(trainIDs), {
         headers: {
-          "Access-Control-Allow-Origin": corsHeader, // CORS
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
           "content-type": "application/json"
         }
       });
@@ -1224,7 +1235,8 @@ const server = Bun.serve({
 
         return new Response(generateFromTrains(trains), {
           headers: {
-            "Access-Control-Allow-Origin": corsHeader, // CORS
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
             "content-type": "text/markdown"
           }
         });
@@ -1238,7 +1250,8 @@ const server = Bun.serve({
         if (trainsArr == undefined) {
           return new Response(JSON.stringify("There are no trains matching that trainNum/trainID."), {
             headers: {
-              "Access-Control-Allow-Origin": corsHeader, // CORS
+              "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+              "Access-Control-Allow-Headers": corsHeadersHeader,
               "content-type": "text/markdown"
             }
           });
@@ -1248,7 +1261,8 @@ const server = Bun.serve({
           if (trainsArr[i].trainID === trainNum) {
             return new Response(generateFromTrain([trainsArr[i]], trainsArr[i].trainID), {
               headers: {
-                "Access-Control-Allow-Origin": corsHeader, // CORS
+                "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+                "Access-Control-Allow-Headers": corsHeadersHeader,
                 "content-type": "text/markdown"
               }
             });
@@ -1257,7 +1271,8 @@ const server = Bun.serve({
 
         return new Response(JSON.stringify("There are no trains matching that trainNum/trainID."), {
           headers: {
-            "Access-Control-Allow-Origin": corsHeader, // CORS
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
             "content-type": "text/markdown"
           }
         });
@@ -1266,7 +1281,8 @@ const server = Bun.serve({
       if (trains[trainNum] == null) {
         return new Response(JSON.stringify("There are no trains matching that trainNum/trainID."), {
           headers: {
-            "Access-Control-Allow-Origin": corsHeader, // CORS
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
             "content-type": "text/markdown"
           }
         });
@@ -1274,7 +1290,8 @@ const server = Bun.serve({
 
       return new Response(generateFromTrain(trains[trainNum], trainNum), {
         headers: {
-          "Access-Control-Allow-Origin": corsHeader, // CORS
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
           "content-type": "text/markdown"
         }
       });
@@ -1359,7 +1376,8 @@ const server = Bun.serve({
             }),
             {
               headers: {
-                "Access-Control-Allow-Origin": corsHeader, // CORS
+                "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+                "Access-Control-Allow-Headers": corsHeadersHeader,
                 "content-type": "application/json",
                 attribution:
                   "Please provide proper attribution to Amtraker on your website and email me (amtraker@piemadd.com) to have this block removed."
@@ -1370,7 +1388,8 @@ const server = Bun.serve({
 
         return new Response(JSON.stringify(trains), {
           headers: {
-            "Access-Control-Allow-Origin": corsHeader, // CORS
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
             "content-type": "application/json"
           }
         });
@@ -1380,7 +1399,8 @@ const server = Bun.serve({
         console.log(request.url, url, "all trains in an array");
         return new Response(JSON.stringify({ 0: Object.values(trains).flatMap((n) => n) }), {
           headers: {
-            "Access-Control-Allow-Origin": corsHeader, // CORS
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
             "content-type": "application/json"
           }
         });
@@ -1394,7 +1414,8 @@ const server = Bun.serve({
         if (trainsArr == undefined) {
           return new Response(JSON.stringify([]), {
             headers: {
-              "Access-Control-Allow-Origin": corsHeader, // CORS
+              "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+              "Access-Control-Allow-Headers": corsHeadersHeader,
               "content-type": "application/json"
             }
           });
@@ -1404,7 +1425,8 @@ const server = Bun.serve({
           if (trainsArr[i].trainID === trainNum) {
             return new Response(JSON.stringify({ [trainNum.split("-")[0]]: [trainsArr[i]] }), {
               headers: {
-                "Access-Control-Allow-Origin": corsHeader, // CORS
+                "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+                "Access-Control-Allow-Headers": corsHeadersHeader,
                 "content-type": "application/json"
               }
             });
@@ -1413,7 +1435,8 @@ const server = Bun.serve({
 
         return new Response(JSON.stringify([]), {
           headers: {
-            "Access-Control-Allow-Origin": corsHeader, // CORS
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
             "content-type": "application/json"
           }
         });
@@ -1422,7 +1445,8 @@ const server = Bun.serve({
       if (trains[trainNum] == null) {
         return new Response(JSON.stringify([]), {
           headers: {
-            "Access-Control-Allow-Origin": corsHeader, // CORS
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
             "content-type": "application/json"
           }
         });
@@ -1430,7 +1454,8 @@ const server = Bun.serve({
 
       return new Response(JSON.stringify({ [trainNum]: trains[trainNum] }), {
         headers: {
-          "Access-Control-Allow-Origin": corsHeader, // CORS
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
           "content-type": "application/json"
         }
       });
@@ -1444,7 +1469,8 @@ const server = Bun.serve({
       if (stationCode === undefined || stations[stationCode] == null) {
         return new Response(JSON.stringify([]), {
           headers: {
-            "Access-Control-Allow-Origin": corsHeader, // CORS
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
             "content-type": "application/json"
           }
         });
@@ -1503,7 +1529,8 @@ const server = Bun.serve({
 
       return new Response(JSON.stringify({ [stationCode]: newStation }), {
         headers: {
-          "Access-Control-Allow-Origin": corsHeader, // CORS
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
           "content-type": "application/json"
         }
       });
@@ -1517,7 +1544,8 @@ const server = Bun.serve({
         console.log(request.url, url, "stations");
         return new Response(generateFromStations(stations), {
           headers: {
-            "Access-Control-Allow-Origin": corsHeader, // CORS
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
             "content-type": "text/markdown"
           }
         });
@@ -1526,7 +1554,8 @@ const server = Bun.serve({
       if (stations[stationCode] == null) {
         return new Response("There are no stations matching that station code.", {
           headers: {
-            "Access-Control-Allow-Origin": corsHeader, // CORS
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
             "content-type": "text/markdown"
           }
         });
@@ -1534,7 +1563,8 @@ const server = Bun.serve({
 
       return new Response(generateFromStation(stations[stationCode]), {
         headers: {
-          "Access-Control-Allow-Origin": corsHeader, // CORS
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
           "content-type": "text/markdown"
         }
       });
@@ -1548,7 +1578,8 @@ const server = Bun.serve({
         console.log(request.url, url, "stations");
         return new Response(JSON.stringify(stations), {
           headers: {
-            "Access-Control-Allow-Origin": corsHeader, // CORS
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
             "content-type": "application/json"
           }
         });
@@ -1557,7 +1588,8 @@ const server = Bun.serve({
       if (stations[stationCode] == null) {
         return new Response(JSON.stringify([]), {
           headers: {
-            "Access-Control-Allow-Origin": corsHeader, // CORS
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
             "content-type": "application/json"
           }
         });
@@ -1565,7 +1597,8 @@ const server = Bun.serve({
 
       return new Response(JSON.stringify({ [stationCode]: stations[stationCode] }), {
         headers: {
-          "Access-Control-Allow-Origin": corsHeader, // CORS
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
           "content-type": "application/json"
         }
       });
@@ -1602,7 +1635,8 @@ const server = Bun.serve({
 
         return new Response(`<?xml version="1.0" encoding="utf-8"?><oembed>${xmlResponse}</oembed>`, {
           headers: {
-            "Access-Control-Allow-Origin": corsHeader, // CORS
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
             "content-type": "text/xml"
           }
         });
@@ -1610,7 +1644,8 @@ const server = Bun.serve({
 
       return new Response(JSON.stringify(oembedResponse, null, 2), {
         headers: {
-          "Access-Control-Allow-Origin": corsHeader, // CORS
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
           "content-type": "application/json"
         }
       });
