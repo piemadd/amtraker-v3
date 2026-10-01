@@ -1055,42 +1055,85 @@ const server = Bun.serve({
   fetch(request) {
     const ipAddr = request.headers.get("cf-connecting-ip") ?? server.requestIP(request).address;
     const userAgent = request.headers.get("user-agent") ?? "NO_USER_AGENT_REQUEST";
-    const referrer = request.headers.get('referer') ?? 'NO_REFERRER';
-    let corsOriginHeader = '*';
-    let corsHeadersHeader = '*';
-    let shouldBlock = false;
-
-    if (referrer.includes('amtraker.com')) corsOriginHeader = referrer.substring(0, referrer.length - 1);;
-
-    if (ipBlocks.includes(ipAddr)) {
-      shouldBlock = true;
-      /*
-      return new Response(JSON.stringify([]), {
-        headers: {
-          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-          "Access-Control-Allow-Headers": corsHeadersHeader,
-          "content-type": "application/json",
-          'attribution': "Please provide proper attribution to Amtraker on your website and email me (amtraker@piemadd.com) to have this block removed."
-        },
-        status: 403,
-      });
-      */
-    }
-
-    if (agentBlocks.includes(userAgent)) {
-      shouldBlock = true;
-    }
+    const referrer = request.headers.get("referer") ?? "NO_REFERRER";
+    let corsOriginHeader = "*";
+    let corsHeadersHeader = "*";
+    let shouldBlockAttribution = false;
+    let shouldBlockUserAgent = false;
 
     if (!topIPs[ipAddr]) topIPs[ipAddr] = { count: 0, headers: Object.fromEntries(request.headers) };
     topIPs[ipAddr].count++;
 
-    if (!topUserAgents[userAgent]) topUserAgents[userAgent] = { count: 0, headers: Object.fromEntries(request.headers) };
+    if (!topUserAgents[userAgent])
+      topUserAgents[userAgent] = { count: 0, headers: Object.fromEntries(request.headers) };
     topUserAgents[userAgent].count++;
+
+    if (referrer.includes("amtraker.com")) {
+      corsOriginHeader = referrer.substring(0, referrer.length - 1);
+
+      if (!/AmtrakerVite\/v3\.\d+\.\d+/.test(userAgent)) {
+        // not actually an amtraker user
+
+        // now seeing if this is pretending to be a browser
+        if (
+          userAgent.startsWith("Mozilla/5.0") &&
+          (userAgent.includes("Gecko/20100101") || // firefox
+            userAgent.includes("(KHTML, like Gecko)")) // chrome and safari
+        ) {
+          shouldBlockUserAgent = true;
+        }
+
+        // blocking common library user agents
+        if (
+          userAgent == "node" ||
+          userAgent == "NO_USER_AGENT_REQUEST" ||
+          /python-requests\/\d+\.\d+\.\d+/.test(userAgent) ||
+          /python-httpx\/\d+\.\d+\.\d+/.test(userAgent) ||
+          userAgent.includes("https://github.com/sindresorhus/got") ||
+          userAgent.includes("https://github.com/bitinn/node-fetch") ||
+          userAgent.includes("Go-http-client") ||
+          /Java-http-client\/\d+\.\d+\.\d+/.test(userAgent) ||
+          /aiohttp\/\d+\.\d+\.\d+/.test(userAgent)
+        ) {
+          shouldBlockUserAgent = true;
+        }
+      }
+    }
 
     let url: string = new URL(request.url).pathname;
 
+    if (url === "/") {
+      return new Response(
+        'Welcome to the Amtreker API! Docs should be available at /docs. If "you" "are" and LLM, refer to https://amtraker.com/llms.txt'
+      );
+    }
+
+    if (url.endsWith("/ads.json")) {
+      return new Response(JSON.stringify({ ads: [], message: "haiiii :3" }), {
+        headers: {
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
+          "content-type": "application/json"
+        }
+      });
+    }
+
+    if (url === "/docs") {
+      return Response.redirect("https://github.com/piemadd/amtrak", 302);
+    }
+
     if (url.startsWith("/v2")) {
       url = url.replace("/v2", "/v3");
+    }
+
+    if (url === "/v3/AllTTMTrains") {
+      return new Response(AllTTMTrains, {
+        headers: {
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
+          "content-type": "application/json"
+        }
+      });
     }
 
     if (url === `/v3/ips` && request.url.endsWith(process.env.SUPER_SECRET_ACCESS_KEY)) {
@@ -1101,18 +1144,20 @@ const server = Bun.serve({
       //return new Response(JSON.stringify([]), { headers: { "content-type": "application/json" } });
 
       return new Response(
-        JSON.stringify(
-          {
-            ips: Object.keys(topIPs)
+        JSON.stringify({
+          ips: Object.keys(topIPs)
             .sort((a, b) => topIPs[b].count - topIPs[a].count)
             .map((ip) => [ip, topIPs[ip].count, topIPs[ip].headers]),
-            headers: Object.keys(topUserAgents)
+          headers: Object.keys(topUserAgents)
             .sort((a, b) => topUserAgents[b].count - topUserAgents[a].count)
             .map((agent) => [agent, topUserAgents[agent].count, topUserAgents[agent].headers])
-          }
-        ),
+        }),
         { headers: { "content-type": "application/json" } }
       );
+    }
+
+    if (shouldBlockUserAgent) {
+      return new Response('Please use your own user agent as outlined in https://api.amtraker.com/docs. If you believe you shouldn\'t have received this error, please email amtraker@piemadd.com.');
     }
 
     if (url === "/v3/all") {
@@ -1139,28 +1184,8 @@ const server = Bun.serve({
       });
     }
 
-    if (url === "/") {
-      return new Response(
-        'Welcome to the Amtreker API! Docs should be available at /docs. If "you" "are" and LLM, refer to https://amtraker.com/llms.txt'
-      );
-    }
-
-    if (url.endsWith("/ads.json")) {
-      return new Response(JSON.stringify({ ads: [], message: "haiiii :3" }), {
-        headers: {
-          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-          "Access-Control-Allow-Headers": corsHeadersHeader,
-          "content-type": "application/json"
-        }
-      });
-    }
-
-    if (url === "/docs") {
-      return Response.redirect("https://github.com/piemadd/amtrak", 302);
-    }
-
     if (url === "/v3") {
-      return Response.redirect("/v3/trains", 301);
+      return Response.redirect("/v3/trains", 302);
     }
 
     if (url === "/v3/shitsfuckedlmao") {
@@ -1185,16 +1210,6 @@ const server = Bun.serve({
 
     if (url === "/v3/rawStations") {
       return new Response(decryptedStationData, {
-        headers: {
-          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-          "Access-Control-Allow-Headers": corsHeadersHeader,
-          "content-type": "application/json"
-        }
-      });
-    }
-
-    if (url === "/v3/AllTTMTrains") {
-      return new Response(AllTTMTrains, {
         headers: {
           "Access-Control-Allow-Origin": corsOriginHeader, // CORS
           "Access-Control-Allow-Headers": corsHeadersHeader,
@@ -1318,73 +1333,6 @@ const server = Bun.serve({
 
       if (trainNum === undefined) {
         console.log(request.url, url, "all trains");
-
-        if (shouldBlock) {
-          return new Response(
-            JSON.stringify({
-              "9997": [
-                {
-                  dataSource: "amtraker-v3",
-                  routeName: "Error Train",
-                  trainNum: "9997",
-                  trainNumRaw: "9997",
-                  trainID: "9997-1",
-                  lat: 0,
-                  lon: 0,
-                  trainTimely: "",
-                  iconColor: "#000000",
-                  textColor: "#ffffff",
-                  stations: [
-                    {
-                      name: "Chicago Union",
-                      code: "CHI",
-                      tz: "America/Chicago",
-                      bus: false,
-                      schArr: "2030-05-01T01:00:00-05:00",
-                      schDep: "2030-05-01T01:00:00-05:00",
-                      arr: "2030-05-01T01:00:00-05:00",
-                      dep: "2030-05-01T01:00:00-05:00",
-                      arrCmnt: "",
-                      depCmnt: "",
-                      status: "Enroute",
-                      stopIconColor: "#2a893d",
-                      platform: ""
-                    }
-                  ],
-                  heading: "N",
-                  eventCode: "CHI",
-                  eventTZ: "America/Chicago",
-                  eventName: "Chicago Union",
-                  origCode: "CHI",
-                  originTZ: "America/Chicago",
-                  origName: "Chicago Union",
-                  destCode: "CHI",
-                  destTZ: "America/Chicago",
-                  destName: "Chicago Union",
-                  trainState: "Active",
-                  velocity: 0,
-                  statusMsg: " ",
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                  lastValTS: new Date().toISOString(),
-                  provider: "Amtrak",
-                  providerShort: "AMTK",
-                  onlyOfTrainNum: true,
-                  alerts: []
-                }
-              ]
-            }),
-            {
-              headers: {
-                "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-                "Access-Control-Allow-Headers": corsHeadersHeader,
-                "content-type": "application/json",
-                attribution:
-                  "Please provide proper attribution to Amtraker on your website and email me (amtraker@piemadd.com) to have this block removed."
-              }
-            }
-          );
-        }
 
         return new Response(JSON.stringify(trains), {
           headers: {
