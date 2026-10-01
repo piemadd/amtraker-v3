@@ -1068,10 +1068,23 @@ const server = Bun.serve({
       topUserAgents[userAgent] = { count: 0, headers: Object.fromEntries(request.headers) };
     topUserAgents[userAgent].count++;
 
+    // preflight
+    if (request.method === "OPTIONS") {
+      return new Response("Departed", {
+        status: 204, // No Content
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, OPTIONS",
+          "Access-Control-Allow-Headers": "*",
+          "Access-Control-Allow-Max-Age": "86400",
+        },
+      });
+    }
+
     if (referrer.includes("amtraker.com")) {
       corsOriginHeader = referrer.substring(0, referrer.length - 1);
 
-      if (!/AmtrakerVite\/v3\.\d+\.\d+/.test(userAgent)) {
+      if (/AmtrakerVite\/v3\.\d+\.\d+/.test(userAgent) != true) {
         // not actually an amtraker user
 
         // now seeing if this is pretending to be a browser
