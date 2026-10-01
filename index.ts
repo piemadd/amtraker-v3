@@ -1157,7 +1157,15 @@ const server = Bun.serve({
     }
 
     if (shouldBlockUserAgent) {
-      return new Response('Please use your own user agent as outlined in https://api.amtraker.com/docs. If you believe you shouldn\'t have received this error, please email amtraker@piemadd.com.');
+      return new Response(
+        "Please use your own user agent as outlined in https://api.amtraker.com/docs. If you believe you shouldn't have received this error, please email amtraker@piemadd.com.",
+        {
+          headers: {
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
+          }
+        }
+      );
     }
 
     if (url === "/v3/all") {
