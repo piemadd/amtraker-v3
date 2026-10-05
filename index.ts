@@ -1057,8 +1057,10 @@ const server = Bun.serve({
     const ipAddr = request.headers.get("cf-connecting-ip") ?? server.requestIP(request).address;
     const userAgent = request.headers.get("user-agent") ?? "NO_USER_AGENT_REQUEST";
     const referrer = request.headers.get("referer") ?? "NO_REFERRER";
+    const amtrakerClientVersion = request.headers.get("amtraker-version") ?? "NO_CLIENT_VERSION";
+    const amtrakerClientMagicNumber = request.headers.get('amtraker-v3-amn') ?? "NO_CLIENT_MAGIC"
     let corsOriginHeader = "*";
-    let corsHeadersHeader = "*";
+    let corsHeadersHeader = "user-agent,amtraker-version,amtraker-v3-amn";
     let shouldBlockAttribution = false;
     let shouldBlockUserAgent = false;
 
@@ -1080,8 +1082,8 @@ const server = Bun.serve({
         status: 204, // No Content
         headers: {
           "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, OPTIONS",
-          "Access-Control-Allow-Headers": "*",
+          "Access-Control-Allow-Methods": "*",
+          "Access-Control-Allow-Headers": "user-agent,amtraker-version",
           "Access-Control-Allow-Max-Age": "86400"
         }
       });
@@ -1099,7 +1101,7 @@ const server = Bun.serve({
           (userAgent.includes("Gecko/20100101") || // firefox
             userAgent.includes("(KHTML, like Gecko)")) // chrome and safari
         ) {
-          //shouldBlockUserAgent = true;
+          shouldBlockUserAgent = true;
         }
 
         // blocking common library user agents
@@ -1114,7 +1116,10 @@ const server = Bun.serve({
           /Java-http-client\/\d+\.\d+\.\d+/.test(userAgent) ||
           /aiohttp\/\d+\.\d+\.\d+/.test(userAgent)
         ) {
-          //shouldBlockUserAgent = true;
+          shouldBlockUserAgent = true;
+          if (userAgent == "NO_USER_AGENT_REQUEST") {
+            console.log(request.headers.get("amtraker-version"))
+          }
         }
       }
     }
@@ -1177,6 +1182,7 @@ const server = Bun.serve({
 
     if (shouldBlockUserAgent) {
       console.log(`Blocking user agent ${userAgent} (ip: ${ipAddr})`);
+      /*
       return new Response(
         `Please use your own user agent as outlined in https://api.amtraker.com/docs. If you believe you shouldn't have received this error, please email amtraker@piemadd.com.\n\nHeaders:\n${JSON.stringify(Object.fromEntries(request.headers), null, 2)}`,
         {
@@ -1187,6 +1193,7 @@ const server = Bun.serve({
           status: 403
         }
       );
+      */
     }
 
     if (url === "/v3/all") {
