@@ -1076,8 +1076,8 @@ const server = Bun.serve({
           "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Methods": "GET, OPTIONS",
           "Access-Control-Allow-Headers": "*",
-          "Access-Control-Allow-Max-Age": "86400",
-        },
+          "Access-Control-Allow-Max-Age": "86400"
+        }
       });
     }
 
@@ -1093,7 +1093,7 @@ const server = Bun.serve({
           (userAgent.includes("Gecko/20100101") || // firefox
             userAgent.includes("(KHTML, like Gecko)")) // chrome and safari
         ) {
-          //shouldBlockUserAgent = true;
+          shouldBlockUserAgent = true;
         }
 
         // blocking common library user agents
@@ -1108,7 +1108,7 @@ const server = Bun.serve({
           /Java-http-client\/\d+\.\d+\.\d+/.test(userAgent) ||
           /aiohttp\/\d+\.\d+\.\d+/.test(userAgent)
         ) {
-          //shouldBlockUserAgent = true;
+          shouldBlockUserAgent = true;
         }
       }
     }
@@ -1171,12 +1171,13 @@ const server = Bun.serve({
 
     if (shouldBlockUserAgent) {
       return new Response(
-        "Please use your own user agent as outlined in https://api.amtraker.com/docs. If you believe you shouldn't have received this error, please email amtraker@piemadd.com.",
+        `Please use your own user agent as outlined in https://api.amtraker.com/docs. If you believe you shouldn't have received this error, please email amtraker@piemadd.com.\n\nHeaders:\n${JSON.stringify(Object.fromEntries(request.headers), null, 2)}`,
         {
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-            "Access-Control-Allow-Headers": corsHeadersHeader,
-          }
+            "Access-Control-Allow-Headers": corsHeadersHeader
+          },
+          status: 403
         }
       );
     }
