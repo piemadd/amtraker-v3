@@ -1054,13 +1054,27 @@ const agentBlocks: string[] = [];
 const server = Bun.serve({
   port: process.env.PORT ?? 3001,
   fetch(request) {
+    // preflight
+    if (request.method === "OPTIONS") {
+      return new Response("Departed", {
+        status: 204, // No Content
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS,PATCH",
+          "Access-Control-Allow-Headers": "user-agent,amtraker-version,amtraker-v3-amn",
+          "Access-Control-Allow-Max-Age": "86400"
+        }
+      });
+    }
+
     const ipAddr = request.headers.get("cf-connecting-ip") ?? server.requestIP(request).address;
     const userAgent = request.headers.get("user-agent") ?? "NO_USER_AGENT_REQUEST";
     const referrer = request.headers.get("referer") ?? "NO_REFERRER";
     const amtrakerClientVersion = request.headers.get("amtraker-version") ?? "NO_CLIENT_VERSION";
-    const amtrakerClientMagicNumber = request.headers.get('amtraker-v3-amn') ?? "NO_CLIENT_MAGIC"
+    const amtrakerClientMagicNumber = request.headers.get("amtraker-v3-amn") ?? "NO_CLIENT_MAGIC";
     let corsOriginHeader = "*";
     let corsHeadersHeader = "user-agent,amtraker-version,amtraker-v3-amn";
+    let corsMethodsHeader = "GET,POST,PUT,DELETE,OPTIONS,PATCH";
     let shouldBlockAttribution = false;
     let shouldBlockUserAgent = false;
 
@@ -1075,19 +1089,6 @@ const server = Bun.serve({
     topUserAgents[userAgent].count++;
     topUserAgents[userAgent].ps =
       topUserAgents[userAgent].count / ((Date.now() - topUserAgents[userAgent].first) / 1000);
-
-    // preflight
-    if (request.method === "OPTIONS") {
-      return new Response("Departed", {
-        status: 204, // No Content
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "*",
-          "Access-Control-Allow-Headers": "user-agent,amtraker-version",
-          "Access-Control-Allow-Max-Age": "86400"
-        }
-      });
-    }
 
     if (referrer.includes("amtraker.com")) {
       corsOriginHeader = referrer.substring(0, referrer.length - 1);
@@ -1118,7 +1119,7 @@ const server = Bun.serve({
         ) {
           shouldBlockUserAgent = true;
           if (userAgent == "NO_USER_AGENT_REQUEST") {
-            console.log(request.headers.get("amtraker-version"))
+            console.log(request.headers.get("amtraker-version"));
           }
         }
       }
@@ -1137,6 +1138,7 @@ const server = Bun.serve({
         headers: {
           "Access-Control-Allow-Origin": corsOriginHeader, // CORS
           "Access-Control-Allow-Headers": corsHeadersHeader,
+          "Access-Control-Allow-Methods": corsMethodsHeader,
           "content-type": "application/json"
         }
       });
@@ -1155,6 +1157,7 @@ const server = Bun.serve({
         headers: {
           "Access-Control-Allow-Origin": corsOriginHeader, // CORS
           "Access-Control-Allow-Headers": corsHeadersHeader,
+          "Access-Control-Allow-Methods": corsMethodsHeader,
           "content-type": "application/json"
         }
       });
@@ -1188,7 +1191,8 @@ const server = Bun.serve({
         {
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-            "Access-Control-Allow-Headers": corsHeadersHeader
+            "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
           },
           status: 403
         }
@@ -1207,6 +1211,7 @@ const server = Bun.serve({
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
             "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
             "content-type": "application/json"
           }
         }
@@ -1218,6 +1223,7 @@ const server = Bun.serve({
         headers: {
           "Access-Control-Allow-Origin": corsOriginHeader, // CORS
           "Access-Control-Allow-Headers": corsHeadersHeader,
+          "Access-Control-Allow-Methods": corsMethodsHeader,
           "content-type": "application/json"
         }
       });
@@ -1232,6 +1238,7 @@ const server = Bun.serve({
         headers: {
           "Access-Control-Allow-Origin": corsOriginHeader, // CORS
           "Access-Control-Allow-Headers": corsHeadersHeader,
+          "Access-Control-Allow-Methods": corsMethodsHeader,
           "content-type": "application/json"
         }
       });
@@ -1242,6 +1249,7 @@ const server = Bun.serve({
         headers: {
           "Access-Control-Allow-Origin": corsOriginHeader, // CORS
           "Access-Control-Allow-Headers": corsHeadersHeader,
+          "Access-Control-Allow-Methods": corsMethodsHeader,
           "content-type": "application/json"
         }
       });
@@ -1252,6 +1260,7 @@ const server = Bun.serve({
         headers: {
           "Access-Control-Allow-Origin": corsOriginHeader, // CORS
           "Access-Control-Allow-Headers": corsHeadersHeader,
+          "Access-Control-Allow-Methods": corsMethodsHeader,
           "content-type": "application/json"
         }
       });
@@ -1262,6 +1271,7 @@ const server = Bun.serve({
         headers: {
           "Access-Control-Allow-Origin": corsOriginHeader, // CORS
           "Access-Control-Allow-Headers": corsHeadersHeader,
+          "Access-Control-Allow-Methods": corsMethodsHeader,
           "content-type": "application/json"
         }
       });
@@ -1274,6 +1284,7 @@ const server = Bun.serve({
         headers: {
           "Access-Control-Allow-Origin": corsOriginHeader, // CORS
           "Access-Control-Allow-Headers": corsHeadersHeader,
+          "Access-Control-Allow-Methods": corsMethodsHeader,
           "content-type": "application/json"
         }
       });
@@ -1291,6 +1302,7 @@ const server = Bun.serve({
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
             "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
             "content-type": "text/markdown"
           }
         });
@@ -1306,6 +1318,7 @@ const server = Bun.serve({
             headers: {
               "Access-Control-Allow-Origin": corsOriginHeader, // CORS
               "Access-Control-Allow-Headers": corsHeadersHeader,
+              "Access-Control-Allow-Methods": corsMethodsHeader,
               "content-type": "text/markdown"
             }
           });
@@ -1317,6 +1330,7 @@ const server = Bun.serve({
               headers: {
                 "Access-Control-Allow-Origin": corsOriginHeader, // CORS
                 "Access-Control-Allow-Headers": corsHeadersHeader,
+                "Access-Control-Allow-Methods": corsMethodsHeader,
                 "content-type": "text/markdown"
               }
             });
@@ -1327,6 +1341,7 @@ const server = Bun.serve({
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
             "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
             "content-type": "text/markdown"
           }
         });
@@ -1337,6 +1352,7 @@ const server = Bun.serve({
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
             "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
             "content-type": "text/markdown"
           }
         });
@@ -1346,6 +1362,7 @@ const server = Bun.serve({
         headers: {
           "Access-Control-Allow-Origin": corsOriginHeader, // CORS
           "Access-Control-Allow-Headers": corsHeadersHeader,
+          "Access-Control-Allow-Methods": corsMethodsHeader,
           "content-type": "text/markdown"
         }
       });
@@ -1377,6 +1394,7 @@ const server = Bun.serve({
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
             "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
             "content-type": "application/json"
           }
         });
@@ -1388,6 +1406,7 @@ const server = Bun.serve({
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
             "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
             "content-type": "application/json"
           }
         });
@@ -1403,6 +1422,7 @@ const server = Bun.serve({
             headers: {
               "Access-Control-Allow-Origin": corsOriginHeader, // CORS
               "Access-Control-Allow-Headers": corsHeadersHeader,
+              "Access-Control-Allow-Methods": corsMethodsHeader,
               "content-type": "application/json"
             }
           });
@@ -1414,6 +1434,7 @@ const server = Bun.serve({
               headers: {
                 "Access-Control-Allow-Origin": corsOriginHeader, // CORS
                 "Access-Control-Allow-Headers": corsHeadersHeader,
+                "Access-Control-Allow-Methods": corsMethodsHeader,
                 "content-type": "application/json"
               }
             });
@@ -1424,6 +1445,7 @@ const server = Bun.serve({
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
             "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
             "content-type": "application/json"
           }
         });
@@ -1434,6 +1456,7 @@ const server = Bun.serve({
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
             "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
             "content-type": "application/json"
           }
         });
@@ -1443,6 +1466,7 @@ const server = Bun.serve({
         headers: {
           "Access-Control-Allow-Origin": corsOriginHeader, // CORS
           "Access-Control-Allow-Headers": corsHeadersHeader,
+          "Access-Control-Allow-Methods": corsMethodsHeader,
           "content-type": "application/json"
         }
       });
@@ -1458,6 +1482,7 @@ const server = Bun.serve({
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
             "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
             "content-type": "application/json"
           }
         });
@@ -1518,6 +1543,7 @@ const server = Bun.serve({
         headers: {
           "Access-Control-Allow-Origin": corsOriginHeader, // CORS
           "Access-Control-Allow-Headers": corsHeadersHeader,
+          "Access-Control-Allow-Methods": corsMethodsHeader,
           "content-type": "application/json"
         }
       });
@@ -1533,6 +1559,7 @@ const server = Bun.serve({
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
             "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
             "content-type": "text/markdown"
           }
         });
@@ -1543,6 +1570,7 @@ const server = Bun.serve({
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
             "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
             "content-type": "text/markdown"
           }
         });
@@ -1552,6 +1580,7 @@ const server = Bun.serve({
         headers: {
           "Access-Control-Allow-Origin": corsOriginHeader, // CORS
           "Access-Control-Allow-Headers": corsHeadersHeader,
+          "Access-Control-Allow-Methods": corsMethodsHeader,
           "content-type": "text/markdown"
         }
       });
@@ -1567,6 +1596,7 @@ const server = Bun.serve({
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
             "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
             "content-type": "application/json"
           }
         });
@@ -1577,6 +1607,7 @@ const server = Bun.serve({
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
             "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
             "content-type": "application/json"
           }
         });
@@ -1586,6 +1617,7 @@ const server = Bun.serve({
         headers: {
           "Access-Control-Allow-Origin": corsOriginHeader, // CORS
           "Access-Control-Allow-Headers": corsHeadersHeader,
+          "Access-Control-Allow-Methods": corsMethodsHeader,
           "content-type": "application/json"
         }
       });
@@ -1624,6 +1656,7 @@ const server = Bun.serve({
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
             "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
             "content-type": "text/xml"
           }
         });
@@ -1633,6 +1666,7 @@ const server = Bun.serve({
         headers: {
           "Access-Control-Allow-Origin": corsOriginHeader, // CORS
           "Access-Control-Allow-Headers": corsHeadersHeader,
+          "Access-Control-Allow-Methods": corsMethodsHeader,
           "content-type": "application/json"
         }
       });
