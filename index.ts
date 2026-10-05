@@ -1170,6 +1170,7 @@ const server = Bun.serve({
     }
 
     if (shouldBlockUserAgent) {
+      console.log(`Blocking user agent ${userAgent}`)
       return new Response(
         `Please use your own user agent as outlined in https://api.amtraker.com/docs. If you believe you shouldn't have received this error, please email amtraker@piemadd.com.\n\nHeaders:\n${JSON.stringify(Object.fromEntries(request.headers), null, 2)}`,
         {
