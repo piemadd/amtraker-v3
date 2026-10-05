@@ -1188,7 +1188,7 @@ const server = Bun.serve({
       const stations = amtrakerCache.getStations();
       const ids = amtrakerCache.getIDs();
 
-      return new Response(JSON.stringify({ trains, stations, ids, shitsFucked, staleData: servedStaleData }), {
+      return new Response(JSON.stringify({ trains, stations, ids, shitsFucked, staleData: servedStaleData, lastUpdatedTime }), {
         headers: {
           "Access-Control-Allow-Origin": corsOriginHeader, // CORS
           "Access-Control-Allow-Headers": corsHeadersHeader,
