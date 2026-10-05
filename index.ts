@@ -1099,7 +1099,7 @@ const server = Bun.serve({
           (userAgent.includes("Gecko/20100101") || // firefox
             userAgent.includes("(KHTML, like Gecko)")) // chrome and safari
         ) {
-          shouldBlockUserAgent = true;
+          //shouldBlockUserAgent = true;
         }
 
         // blocking common library user agents
@@ -1114,7 +1114,7 @@ const server = Bun.serve({
           /Java-http-client\/\d+\.\d+\.\d+/.test(userAgent) ||
           /aiohttp\/\d+\.\d+\.\d+/.test(userAgent)
         ) {
-          shouldBlockUserAgent = true;
+          //shouldBlockUserAgent = true;
         }
       }
     }
