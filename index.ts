@@ -18,6 +18,7 @@ const rawStations = JSON.parse(fs.readFileSync("./rawStations.json", { encoding:
 
 import calculateIconColor from "./calculateIconColor";
 
+const startupTime = Date.now();
 let lastUpdatedTime = {
   updatedAt: 0,
   updatedAtISO: "1970-01-01T00:00:00.000Z",
@@ -1061,12 +1062,17 @@ const server = Bun.serve({
     let shouldBlockAttribution = false;
     let shouldBlockUserAgent = false;
 
-    if (!topIPs[ipAddr]) topIPs[ipAddr] = { count: 0, headers: Object.fromEntries(request.headers) };
+    if (!topIPs[ipAddr])
+      topIPs[ipAddr] = { count: 0, first: Date.now(), ps: 0, headers: Object.fromEntries(request.headers) };
     topIPs[ipAddr].count++;
+    topIPs[ipAddr].ps = topIPs[ipAddr].count / ((Date.now() - topIPs[ipAddr].first) / 1000);
 
+    //startupTime
     if (!topUserAgents[userAgent])
-      topUserAgents[userAgent] = { count: 0, headers: Object.fromEntries(request.headers) };
+      topUserAgents[userAgent] = { count: 0, first: Date.now(), ps: 0, headers: Object.fromEntries(request.headers) };
     topUserAgents[userAgent].count++;
+    topUserAgents[userAgent].ps =
+      topUserAgents[userAgent].count / ((Date.now() - topUserAgents[userAgent].first) / 1000);
 
     // preflight
     if (request.method === "OPTIONS") {
@@ -1160,17 +1166,17 @@ const server = Bun.serve({
         JSON.stringify({
           ips: Object.keys(topIPs)
             .sort((a, b) => topIPs[b].count - topIPs[a].count)
-            .map((ip) => [ip, topIPs[ip].count, topIPs[ip].headers]),
+            .map((ip) => [ip, topIPs[ip].count, topIPs[ip].ps, topIPs[ip].headers]),
           headers: Object.keys(topUserAgents)
             .sort((a, b) => topUserAgents[b].count - topUserAgents[a].count)
-            .map((agent) => [agent, topUserAgents[agent].count, topUserAgents[agent].headers])
+            .map((agent) => [agent, topUserAgents[agent].count, topUserAgents[agent].ps, topUserAgents[agent].headers])
         }),
         { headers: { "content-type": "application/json" } }
       );
     }
 
     if (shouldBlockUserAgent) {
-      console.log(`Blocking user agent ${userAgent} (ip: ${ipAddr})`)
+      console.log(`Blocking user agent ${userAgent} (ip: ${ipAddr})`);
       return new Response(
         `Please use your own user agent as outlined in https://api.amtraker.com/docs. If you believe you shouldn't have received this error, please email amtraker@piemadd.com.\n\nHeaders:\n${JSON.stringify(Object.fromEntries(request.headers), null, 2)}`,
         {
@@ -1188,13 +1194,16 @@ const server = Bun.serve({
       const stations = amtrakerCache.getStations();
       const ids = amtrakerCache.getIDs();
 
-      return new Response(JSON.stringify({ trains, stations, ids, shitsFucked, staleData: servedStaleData, lastUpdatedTime }), {
-        headers: {
-          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-          "Access-Control-Allow-Headers": corsHeadersHeader,
-          "content-type": "application/json"
+      return new Response(
+        JSON.stringify({ trains, stations, ids, shitsFucked, staleData: servedStaleData, lastUpdatedTime }),
+        {
+          headers: {
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
+            "content-type": "application/json"
+          }
         }
-      });
+      );
     }
 
     if (url === "/v3/times") {
