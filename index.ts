@@ -934,7 +934,7 @@ const updateTrains = async () => {
     trains[rawTrainData.trainnum].push(train);
 
     if (train.trainState === "Active") {
-      const timeSinceUpdate = Math.max(nowCleaning - new Date(train.lastValTS).valueOf(), 0);
+      const timeSinceUpdate = Math.max(nowCleaning - new Date(train.updatedAt).valueOf(), 0);
       staleData.avgLastUpdate += timeSinceUpdate;
       staleData.lastUpdatedArr.push({ timeSince: timeSinceUpdate, trainID: train.trainID });
       staleData.activeTrains++;
