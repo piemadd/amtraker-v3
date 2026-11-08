@@ -761,15 +761,15 @@ const updateTrains = async () => {
     let stations = rawStations.map((station) => {
       const actualCode = amtrakStationCodeReplacements[station.code] ?? station.code;
 
-      const backupData = backupAmtrakStationData[station.code];
+      const backupData = backupAmtrakStationData[station.code] ?? {};
 
       if (!allStations[actualCode]) {
         const newStation = {
-          name: stationMetaData.stationNames[station.code] ?? backupData.stopName,
+          name: stationMetaData.stationNames[station.code] ?? backupData?.stopName,
           code: actualCode,
-          tz: stationMetaData.timeZones[station.code] ?? backupData.stopTZ,
-          lat: backupData.stopLat ?? 0,
-          lon: backupData.stopLon ?? 0,
+          tz: stationMetaData.timeZones[station.code] ?? backupData?.stopTZ,
+          lat: backupData?.stopLat ?? 0,
+          lon: backupData?.stopLon ?? 0,
           hasAddress: false,
           address1: "",
           address2: "",
