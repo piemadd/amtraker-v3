@@ -1090,9 +1090,11 @@ const server = Bun.serve({
     topUserAgents[userAgent].ps =
       topUserAgents[userAgent].count / ((Date.now() - topUserAgents[userAgent].first) / 1000);
 
-    if (referrer.includes("amtraker.com")) {
-      corsOriginHeader = referrer.substring(0, referrer.length - 1);
+    if (referrer != 'NO_REFERRER') {
+      //corsOriginHeader = referrer.substring(0, referrer.length - 1);
+    }
 
+    if (referrer.includes("amtraker.com")) {
       if (/AmtrakerVite\/v3\.\d+\.\d+/.test(userAgent) != true) {
         // not actually an amtraker user
 
