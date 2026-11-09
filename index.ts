@@ -1184,7 +1184,8 @@ const server = Bun.serve({
     }
 
     if (shouldBlockUserAgent) {
-      console.log(`Blocking user agent ${userAgent} (ip: ${ipAddr})`);
+      //console.log(`Blocking user agent ${userAgent} (ip: ${ipAddr})`);
+      /*
       return new Response(
         `Please use your own user agent as outlined in https://api.amtraker.com/docs. If you believe you shouldn't have received this error, please email amtraker@piemadd.com.\n\nUser Agent: ${userAgent}`,
         {
@@ -1196,6 +1197,7 @@ const server = Bun.serve({
           status: 403
         }
       );
+      */
     }
 
     if (url === "/v3/all") {
