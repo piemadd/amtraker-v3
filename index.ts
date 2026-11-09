@@ -761,7 +761,7 @@ const updateTrains = async () => {
     let stations = rawStations.map((station) => {
       const actualCode = amtrakStationCodeReplacements[station.code] ?? station.code;
 
-      const backupData = backupAmtrakStationData[station.code] ?? {};
+      const backupData = backupAmtrakStationData[station.code];
 
       if (!allStations[actualCode]) {
         const newStation = {
@@ -1185,9 +1185,8 @@ const server = Bun.serve({
 
     if (shouldBlockUserAgent) {
       console.log(`Blocking user agent ${userAgent} (ip: ${ipAddr})`);
-      /*
       return new Response(
-        `Please use your own user agent as outlined in https://api.amtraker.com/docs. If you believe you shouldn't have received this error, please email amtraker@piemadd.com.\n\nHeaders:\n${JSON.stringify(Object.fromEntries(request.headers), null, 2)}`,
+        `Please use your own user agent as outlined in https://api.amtraker.com/docs. If you believe you shouldn't have received this error, please email amtraker@piemadd.com.\n\nUser Agent: ${userAgent}`,
         {
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
@@ -1197,7 +1196,6 @@ const server = Bun.serve({
           status: 403
         }
       );
-      */
     }
 
     if (url === "/v3/all") {
