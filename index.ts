@@ -55,6 +55,7 @@ let backupAmtrakStationData: any = {};
 
 let topIPs: any = {};
 let topUserAgents: any = {};
+let blockedIPs: any = {};
 
 //https://stackoverflow.com/questions/196972/convert-string-to-title-case-with-javascript
 const title = (str: string) => {
@@ -1044,6 +1045,13 @@ const cleanUpStats = () => {
     .forEach((agent) => {
       delete topUserAgents[agent];
     });
+
+  Object.keys(blockedIPs)
+    .sort((a, b) => blockedIPs[b].count - blockedIPs[a].count)
+    .slice(250)
+    .forEach((agent) => {
+      delete blockedIPs[agent];
+    });
 };
 
 setInterval(() => cleanUpStats(), 300 * 1000);
@@ -1078,19 +1086,7 @@ const server = Bun.serve({
     let shouldBlockAttribution = false;
     let shouldBlockUserAgent = false;
 
-    if (!topIPs[ipAddr])
-      topIPs[ipAddr] = { count: 0, first: Date.now(), ps: 0, headers: Object.fromEntries(request.headers) };
-    topIPs[ipAddr].count++;
-    topIPs[ipAddr].ps = topIPs[ipAddr].count / ((Date.now() - topIPs[ipAddr].first) / 1000);
-
-    //startupTime
-    if (!topUserAgents[userAgent])
-      topUserAgents[userAgent] = { count: 0, first: Date.now(), ps: 0, headers: Object.fromEntries(request.headers) };
-    topUserAgents[userAgent].count++;
-    topUserAgents[userAgent].ps =
-      topUserAgents[userAgent].count / ((Date.now() - topUserAgents[userAgent].first) / 1000);
-
-    if (referrer != 'NO_REFERRER') {
+    if (referrer != "NO_REFERRER") {
       //corsOriginHeader = referrer.substring(0, referrer.length - 1);
     }
 
@@ -1127,11 +1123,29 @@ const server = Bun.serve({
       }
     }
 
+    if (shouldBlockUserAgent) {
+      if (!blockedIPs[ipAddr])
+        blockedIPs[ipAddr] = { count: 0, first: Date.now(), ps: 0, headers: Object.fromEntries(request.headers) };
+      blockedIPs[ipAddr].count++;
+      blockedIPs[ipAddr].ps = blockedIPs[ipAddr].count / ((Date.now() - blockedIPs[ipAddr].first) / 1000);
+    } else {
+      if (!topIPs[ipAddr])
+        topIPs[ipAddr] = { count: 0, first: Date.now(), ps: 0, headers: Object.fromEntries(request.headers) };
+      topIPs[ipAddr].count++;
+      topIPs[ipAddr].ps = topIPs[ipAddr].count / ((Date.now() - topIPs[ipAddr].first) / 1000);
+
+      if (!topUserAgents[userAgent])
+        topUserAgents[userAgent] = { count: 0, first: Date.now(), ps: 0, headers: Object.fromEntries(request.headers) };
+      topUserAgents[userAgent].count++;
+      topUserAgents[userAgent].ps =
+        topUserAgents[userAgent].count / ((Date.now() - topUserAgents[userAgent].first) / 1000);
+    }
+
     let url: string = new URL(request.url).pathname;
 
     if (url === "/") {
       return new Response(
-        'Welcome to the Amtreker API! Docs should be available at /docs. If "you" "are" and LLM, refer to https://amtraker.com/llms.txt'
+        'Welcome to the Amtraker API! Docs should be available at /docs. If "you" "are" and LLM, refer to https://amtraker.com/llms.txt'
       );
     }
 
@@ -1189,7 +1203,7 @@ const server = Bun.serve({
       //console.log(`Blocking user agent ${userAgent} (ip: ${ipAddr})`);
       /*
       return new Response(
-        `Please use your own user agent as outlined in https://api.amtraker.com/docs. If you believe you shouldn't have received this error, please email amtraker@piemadd.com.\n\nUser Agent: ${userAgent}`,
+        `"Please use your own user agent as outlined in https://api.amtraker.com/docs. If you believe you shouldn't have received this error, please email amtraker@piemadd.com.\n\nUser Agent: ${userAgent}"`,
         {
           headers: {
             "Access-Control-Allow-Origin": corsOriginHeader, // CORS
