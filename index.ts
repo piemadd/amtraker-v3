@@ -1701,6 +1701,17 @@ const server = Bun.serve({
     }
     */
 
+    if (url.startsWith("/robots.txt")) {
+      return new Response('User-agent: *\nAllow: /\n\nSitemap: https://amtraker.com/sitemap.xml', {
+          headers: {
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
+            "content-type": "text/plain"
+          }
+        });
+    }
+
     return new Response("Not found", { status: 404 });
   }
 });
