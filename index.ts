@@ -11,7 +11,7 @@ import { Train, Station, StationStatus, TrainResponse, StationResponse } from ".
 import { trainNames, viaTrainNames } from "./data/trains";
 import * as stationMetaData from "./data/stations";
 import { amtrakStationCodeReplacements } from "./data/sharedStations";
-import { generateFromTrains, generateFromTrain, generateFromStations, generateFromStation } from "./slopGen";
+import { generateFromTrains, generateFromTrain, generateFromStations, generateFromStation, generateSitemap } from "./slopGen";
 import cache from "./cache";
 
 const rawStations = JSON.parse(fs.readFileSync("./rawStations.json", { encoding: "utf8" }));
@@ -1306,84 +1306,6 @@ const server = Bun.serve({
       });
     }
 
-    if (url.startsWith("/v3/md/trains")) {
-      const trainNum = url.split("/")[4];
-
-      const trains = amtrakerCache.getTrains();
-
-      if (trainNum === undefined) {
-        console.log(request.url, url, "all trains");
-
-        return new Response(generateFromTrains(trains), {
-          headers: {
-            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-            "Access-Control-Allow-Headers": corsHeadersHeader,
-            "Access-Control-Allow-Methods": corsMethodsHeader,
-            "content-type": "text/markdown"
-          }
-        });
-      }
-
-      console.log(request.url, url, "train num", trainNum);
-
-      if (trainNum.split("-").length === 2) {
-        const trainsArr = trains[trainNum.split("-")[0]];
-
-        if (trainsArr == undefined) {
-          return new Response(JSON.stringify("There are no trains matching that trainNum/trainID."), {
-            headers: {
-              "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-              "Access-Control-Allow-Headers": corsHeadersHeader,
-              "Access-Control-Allow-Methods": corsMethodsHeader,
-              "content-type": "text/markdown"
-            }
-          });
-        }
-
-        for (let i = 0; i < trainsArr.length; i++) {
-          if (trainsArr[i].trainID === trainNum) {
-            return new Response(generateFromTrain([trainsArr[i]], trainsArr[i].trainID), {
-              headers: {
-                "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-                "Access-Control-Allow-Headers": corsHeadersHeader,
-                "Access-Control-Allow-Methods": corsMethodsHeader,
-                "content-type": "text/markdown"
-              }
-            });
-          }
-        }
-
-        return new Response(JSON.stringify("There are no trains matching that trainNum/trainID."), {
-          headers: {
-            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-            "Access-Control-Allow-Headers": corsHeadersHeader,
-            "Access-Control-Allow-Methods": corsMethodsHeader,
-            "content-type": "text/markdown"
-          }
-        });
-      }
-
-      if (trains[trainNum] == null) {
-        return new Response(JSON.stringify("There are no trains matching that trainNum/trainID."), {
-          headers: {
-            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-            "Access-Control-Allow-Headers": corsHeadersHeader,
-            "Access-Control-Allow-Methods": corsMethodsHeader,
-            "content-type": "text/markdown"
-          }
-        });
-      }
-
-      return new Response(generateFromTrain(trains[trainNum], trainNum), {
-        headers: {
-          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-          "Access-Control-Allow-Headers": corsHeadersHeader,
-          "Access-Control-Allow-Methods": corsMethodsHeader,
-          "content-type": "text/markdown"
-        }
-      });
-    }
-
     if (url.startsWith("/v3/trains")) {
       const trainNum = url.split("/")[3];
 
@@ -1565,43 +1487,6 @@ const server = Bun.serve({
       });
     }
 
-    if (url.startsWith("/v3/md/stations")) {
-      const stationCode = url.split("/")[4];
-      const stations = amtrakerCache.getStations();
-
-      if (stationCode === undefined) {
-        console.log(request.url, url, "stations");
-        return new Response(generateFromStations(stations), {
-          headers: {
-            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-            "Access-Control-Allow-Headers": corsHeadersHeader,
-            "Access-Control-Allow-Methods": corsMethodsHeader,
-            "content-type": "text/markdown"
-          }
-        });
-      }
-
-      if (stations[stationCode] == null) {
-        return new Response("There are no stations matching that station code.", {
-          headers: {
-            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-            "Access-Control-Allow-Headers": corsHeadersHeader,
-            "Access-Control-Allow-Methods": corsMethodsHeader,
-            "content-type": "text/markdown"
-          }
-        });
-      }
-
-      return new Response(generateFromStation(stations[stationCode]), {
-        headers: {
-          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-          "Access-Control-Allow-Headers": corsHeadersHeader,
-          "Access-Control-Allow-Methods": corsMethodsHeader,
-          "content-type": "text/markdown"
-        }
-      });
-    }
-
     if (url.startsWith("/v3/stations")) {
       const stationCode = url.split("/")[3];
       const stations = amtrakerCache.getStations();
@@ -1687,6 +1572,134 @@ const server = Bun.serve({
         }
       });
     }
+
+    if (url.startsWith("/v3/md/trains")) {
+      const trainNum = url.split("/")[4];
+
+      const trains = amtrakerCache.getTrains();
+
+      if (trainNum === undefined) {
+        console.log(request.url, url, "all trains");
+
+        return new Response(generateFromTrains(trains), {
+          headers: {
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
+            "content-type": "text/markdown"
+          }
+        });
+      }
+
+      console.log(request.url, url, "train num", trainNum);
+
+      if (trainNum.split("-").length === 2) {
+        const trainsArr = trains[trainNum.split("-")[0]];
+
+        if (trainsArr == undefined) {
+          return new Response(JSON.stringify("There are no trains currently tracking that match that trainNum/trainID. Serve scheduled data."), {
+            headers: {
+              "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+              "Access-Control-Allow-Headers": corsHeadersHeader,
+              "Access-Control-Allow-Methods": corsMethodsHeader,
+              "content-type": "text/markdown"
+            }
+          });
+        }
+
+        for (let i = 0; i < trainsArr.length; i++) {
+          if (trainsArr[i].trainID === trainNum) {
+            return new Response(generateFromTrain([trainsArr[i]], trainsArr[i].trainID), {
+              headers: {
+                "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+                "Access-Control-Allow-Headers": corsHeadersHeader,
+                "Access-Control-Allow-Methods": corsMethodsHeader,
+                "content-type": "text/markdown"
+              }
+            });
+          }
+        }
+
+        return new Response(JSON.stringify("There are no trains matching that trainNum/trainID."), {
+          headers: {
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
+            "content-type": "text/markdown"
+          }
+        });
+      }
+
+      if (trains[trainNum] == null) {
+        return new Response(JSON.stringify("There are no trains matching that trainNum/trainID."), {
+          headers: {
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
+            "content-type": "text/markdown"
+          }
+        });
+      }
+
+      return new Response(generateFromTrain(trains[trainNum], trainNum), {
+        headers: {
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
+          "Access-Control-Allow-Methods": corsMethodsHeader,
+          "content-type": "text/markdown"
+        }
+      });
+    }
+
+    if (url.startsWith("/v3/md/stations")) {
+      const stationCode = url.split("/")[4];
+      const stations = amtrakerCache.getStations();
+
+      if (stationCode === undefined) {
+        console.log(request.url, url, "stations");
+        return new Response(generateFromStations(stations), {
+          headers: {
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
+            "content-type": "text/markdown"
+          }
+        });
+      }
+
+      if (stations[stationCode] == null) {
+        return new Response("There are no stations matching that station code.", {
+          headers: {
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
+            "content-type": "text/markdown"
+          }
+        });
+      }
+
+      return new Response(generateFromStation(stations[stationCode]), {
+        headers: {
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
+          "Access-Control-Allow-Methods": corsMethodsHeader,
+          "content-type": "text/markdown"
+        }
+      });
+    }
+
+    /*
+    if (url.startsWith("/v3/sitemap-json.xml")) {
+      return new Response(generateSitemap(amtrakerCache.getTrains() ,amtrakerCache.getStations(), false), {
+          headers: {
+            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+            "Access-Control-Allow-Headers": corsHeadersHeader,
+            "Access-Control-Allow-Methods": corsMethodsHeader,
+            "content-type": "text/xml; charset=utf-8"
+          }
+        });
+    }
+    */
 
     return new Response("Not found", { status: 404 });
   }
