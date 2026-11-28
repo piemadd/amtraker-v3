@@ -11,7 +11,13 @@ import { Train, Station, StationStatus, TrainResponse, StationResponse } from ".
 import { trainNames, viaTrainNames } from "./data/trains";
 import * as stationMetaData from "./data/stations";
 import { amtrakStationCodeReplacements } from "./data/sharedStations";
-import { generateFromTrains, generateFromTrain, generateFromStations, generateFromStation, generateSitemap } from "./slopGen";
+import {
+  generateFromTrains,
+  generateFromTrain,
+  generateFromStations,
+  generateFromStation,
+  generateSitemap
+} from "./slopGen";
 import cache from "./cache";
 
 const rawStations = JSON.parse(fs.readFileSync("./rawStations.json", { encoding: "utf8" }));
@@ -1125,17 +1131,35 @@ const server = Bun.serve({
 
     if (shouldBlockUserAgent) {
       if (!blockedIPs[ipAddr])
-        blockedIPs[ipAddr] = { count: 0, first: Date.now(), ps: 0, headers: Object.fromEntries(request.headers), url: request.url };
+        blockedIPs[ipAddr] = {
+          count: 0,
+          first: Date.now(),
+          ps: 0,
+          headers: Object.fromEntries(request.headers),
+          url: request.url
+        };
       blockedIPs[ipAddr].count++;
       blockedIPs[ipAddr].ps = blockedIPs[ipAddr].count / ((Date.now() - blockedIPs[ipAddr].first) / 1000);
     } else {
       if (!topIPs[ipAddr])
-        topIPs[ipAddr] = { count: 0, first: Date.now(), ps: 0, headers: Object.fromEntries(request.headers), url: request.url };
+        topIPs[ipAddr] = {
+          count: 0,
+          first: Date.now(),
+          ps: 0,
+          headers: Object.fromEntries(request.headers),
+          url: request.url
+        };
       topIPs[ipAddr].count++;
       topIPs[ipAddr].ps = topIPs[ipAddr].count / ((Date.now() - topIPs[ipAddr].first) / 1000);
 
       if (!topUserAgents[userAgent])
-        topUserAgents[userAgent] = { count: 0, first: Date.now(), ps: 0, headers: Object.fromEntries(request.headers), url: request.url };
+        topUserAgents[userAgent] = {
+          count: 0,
+          first: Date.now(),
+          ps: 0,
+          headers: Object.fromEntries(request.headers),
+          url: request.url
+        };
       topUserAgents[userAgent].count++;
       topUserAgents[userAgent].ps =
         topUserAgents[userAgent].count / ((Date.now() - topUserAgents[userAgent].first) / 1000);
@@ -1190,10 +1214,10 @@ const server = Bun.serve({
         JSON.stringify({
           ips: Object.keys(topIPs)
             .sort((a, b) => topIPs[b].count - topIPs[a].count)
-            .map((ip) => [ip, topIPs[ip].count, topIPs[ip].ps, topIPs[ip].headers]),
+            .map((ip) => [ip, topIPs[ip].count, topIPs[ip].ps, topIPs[ip].url, topIPs[ip].headers]),
           headers: Object.keys(topUserAgents)
             .sort((a, b) => topUserAgents[b].count - topUserAgents[a].count)
-            .map((agent) => [agent, topUserAgents[agent].count, topUserAgents[agent].ps, topUserAgents[agent].headers])
+            .map((agent) => [agent, topUserAgents[agent].count, topUserAgents[agent].ps, topUserAgents[agent].url, topUserAgents[agent].headers])
         }),
         { headers: { "content-type": "application/json" } }
       );
@@ -1597,14 +1621,19 @@ const server = Bun.serve({
         const trainsArr = trains[trainNum.split("-")[0]];
 
         if (trainsArr == undefined) {
-          return new Response(JSON.stringify("There are no trains currently tracking that match that trainNum/trainID. Serve scheduled data."), {
-            headers: {
-              "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-              "Access-Control-Allow-Headers": corsHeadersHeader,
-              "Access-Control-Allow-Methods": corsMethodsHeader,
-              "content-type": "text/markdown"
+          return new Response(
+            JSON.stringify(
+              "There are no trains currently tracking that match that trainNum/trainID. Serve scheduled data."
+            ),
+            {
+              headers: {
+                "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+                "Access-Control-Allow-Headers": corsHeadersHeader,
+                "Access-Control-Allow-Methods": corsMethodsHeader,
+                "content-type": "text/markdown"
+              }
             }
-          });
+          );
         }
 
         for (let i = 0; i < trainsArr.length; i++) {
@@ -1702,14 +1731,14 @@ const server = Bun.serve({
     */
 
     if (url.startsWith("/robots.txt")) {
-      return new Response('User-agent: *\nAllow: /\n\nSitemap: https://amtraker.com/sitemap.xml', {
-          headers: {
-            "Access-Control-Allow-Origin": corsOriginHeader, // CORS
-            "Access-Control-Allow-Headers": corsHeadersHeader,
-            "Access-Control-Allow-Methods": corsMethodsHeader,
-            "content-type": "text/plain"
-          }
-        });
+      return new Response("User-agent: *\nAllow: /\n\nSitemap: https://amtraker.com/sitemap.xml", {
+        headers: {
+          "Access-Control-Allow-Origin": corsOriginHeader, // CORS
+          "Access-Control-Allow-Headers": corsHeadersHeader,
+          "Access-Control-Allow-Methods": corsMethodsHeader,
+          "content-type": "text/plain"
+        }
+      });
     }
 
     return new Response("Not found", { status: 404 });
