@@ -1125,17 +1125,17 @@ const server = Bun.serve({
 
     if (shouldBlockUserAgent) {
       if (!blockedIPs[ipAddr])
-        blockedIPs[ipAddr] = { count: 0, first: Date.now(), ps: 0, headers: Object.fromEntries(request.headers) };
+        blockedIPs[ipAddr] = { count: 0, first: Date.now(), ps: 0, headers: Object.fromEntries(request.headers), url: request.url };
       blockedIPs[ipAddr].count++;
       blockedIPs[ipAddr].ps = blockedIPs[ipAddr].count / ((Date.now() - blockedIPs[ipAddr].first) / 1000);
     } else {
       if (!topIPs[ipAddr])
-        topIPs[ipAddr] = { count: 0, first: Date.now(), ps: 0, headers: Object.fromEntries(request.headers) };
+        topIPs[ipAddr] = { count: 0, first: Date.now(), ps: 0, headers: Object.fromEntries(request.headers), url: request.url };
       topIPs[ipAddr].count++;
       topIPs[ipAddr].ps = topIPs[ipAddr].count / ((Date.now() - topIPs[ipAddr].first) / 1000);
 
       if (!topUserAgents[userAgent])
-        topUserAgents[userAgent] = { count: 0, first: Date.now(), ps: 0, headers: Object.fromEntries(request.headers) };
+        topUserAgents[userAgent] = { count: 0, first: Date.now(), ps: 0, headers: Object.fromEntries(request.headers), url: request.url };
       topUserAgents[userAgent].count++;
       topUserAgents[userAgent].ps =
         topUserAgents[userAgent].count / ((Date.now() - topUserAgents[userAgent].first) / 1000);
