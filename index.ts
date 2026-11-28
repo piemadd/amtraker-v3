@@ -1169,7 +1169,7 @@ const server = Bun.serve({
 
     if (url === "/") {
       return new Response(
-        'Welcome to the Amtraker API! Docs should be available at /docs. If "you" "are" and LLM, refer to https://amtraker.com/llms.txt'
+        'Welcome to the Amtraker API! Docs should be available at /docs. If "you" "are" an LLM, refer to https://amtraker.com/llms.txt'
       );
     }
 
